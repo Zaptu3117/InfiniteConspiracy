@@ -1,0 +1,89 @@
+{
+  "document_types": {
+    "email": {
+      "template": "email.json.j2",
+      "required_fields": ["from", "to", "subject", "body", "timestamp"],
+      "optional_fields": ["cc", "bcc", "attachments"],
+      "supports_encryption": true,
+      "weight": 1.5
+    },
+    "diary": {
+      "template": "diary.json.j2",
+      "required_fields": ["date", "entry_text", "author"],
+      "optional_fields": ["mood", "location"],
+      "supports_encryption": true,
+      "weight": 1.2
+    },
+    "police_report": {
+      "template": "police_report.json.j2",
+      "required_fields": ["case_number", "officer", "date", "incident_description"],
+      "optional_fields": ["witnesses", "evidence_list", "attachments"],
+      "supports_encryption": false,
+      "weight": 1.0
+    },
+    "witness_statement": {
+      "template": "witness_statement.json.j2",
+      "required_fields": ["witness_name", "date", "statement_text", "officer"],
+      "optional_fields": ["contact_info", "signed"],
+      "supports_encryption": false,
+      "weight": 1.0
+    },
+    "badge_log": {
+      "template": "badge_log.json.j2",
+      "required_fields": ["entries"],
+      "optional_fields": ["facility_name", "log_period"],
+      "supports_encryption": false,
+      "weight": 1.3
+    },
+    "bank_statement": {
+      "template": "bank_statement.json.j2",
+      "required_fields": ["account_holder", "account_number", "period", "transactions"],
+      "optional_fields": ["opening_balance", "closing_balance"],
+      "supports_encryption": false,
+      "weight": 1.0
+    },
+    "newspaper": {
+      "template": "newspaper.json.j2",
+      "required_fields": ["headline", "date", "content", "reporter"],
+      "optional_fields": ["images", "section"],
+      "supports_encryption": false,
+      "weight": 1.2
+    },
+    "internal_memo": {
+      "template": "internal_memo.json.j2",
+      "required_fields": ["from", "to", "date", "subject", "content"],
+      "optional_fields": ["classification", "attachments"],
+      "supports_encryption": true,
+      "weight": 1.3
+    },
+    "phone_record": {
+      "template": "phone_record.json.j2",
+      "required_fields": ["phone_number", "period", "call_log"],
+      "optional_fields": ["account_holder"],
+      "supports_encryption": false,
+      "weight": 1.0
+    },
+    "receipt": {
+      "template": "receipt.json.j2",
+      "required_fields": ["merchant", "date", "time", "items", "total"],
+      "optional_fields": ["payment_method", "transaction_id"],
+      "supports_encryption": false,
+      "weight": 0.8
+    },
+    "surveillance_log": {
+      "template": "surveillance_log.json.j2",
+      "required_fields": ["location", "date", "entries"],
+      "optional_fields": ["operator", "camera_ids"],
+      "supports_encryption": false,
+      "weight": 1.2
+    },
+    "medical_record": {
+      "template": "medical_record.json.j2",
+      "required_fields": ["patient_name", "date", "procedure_or_visit", "doctor"],
+      "optional_fields": ["diagnosis", "medications"],
+      "supports_encryption": false,
+      "weight": 1.0
+    }
+  }
+}
+

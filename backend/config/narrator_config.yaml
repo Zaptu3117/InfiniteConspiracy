@@ -1,0 +1,88 @@
+pipeline:
+  nodes:
+    - initialize_mystery
+    - select_documents
+    - generate_proof_tree
+    - generate_content
+    - apply_cryptography
+    - inject_red_herrings
+    - generate_images
+    - validate_automation
+    - finalize
+
+mystery_generation:
+  min_documents: 20
+  max_documents: 25
+  min_images: 8
+  max_images: 12
+  min_proof_hops: 3
+  max_proof_hops: 7
+  difficulty_range: [1, 10]
+
+proof_tree:
+  documents_per_hop: [2, 4]
+  max_regeneration_attempts: 3
+  validation_confidence_threshold: 0.8
+
+anti_automation:
+  single_llm_test_required: true
+  multi_hop_test_required: true
+  max_llm_context_tokens: 100000
+
+image_generation:
+  max_retries: 5
+  vlm_confidence_threshold: 0.9
+  replicate_model: "black-forest-labs/flux-schnell"
+
+cryptography:
+  enabled: true
+  min_encrypted_documents: 2
+  max_encrypted_documents: 5
+  key_scatter_distance: [3, 5]
+
+red_herrings:
+  enabled: true
+  min_false_leads: 2
+  max_false_leads: 4
+  contradiction_probability: 0.3
+
+# Multi-Step Narrator Configuration
+narrator:
+  model: "llama3.1-70b"
+  setting: "corporate office"
+  time_period: "modern day"
+  
+  step0_proof_tree:
+    temperature: 0.7
+    max_tokens: 2500
+  
+  step1_characters:
+    temperature: 0.8
+    max_tokens: 3000
+    num_characters: [5, 10]
+  
+  step2_timeline:
+    temperature: 0.7
+    max_tokens: 2500
+    time_range_days: 7
+  
+  step3_locations:
+    temperature: 0.7
+    max_tokens: 1500
+    num_locations: [3, 8]
+  
+  step4_document_plan:
+    temperature: 0.6
+    max_tokens: 4000
+  
+  step5_graph_assembly:
+    temperature: 0.5
+    max_tokens: 2500
+
+# Parallel Document Generation Configuration
+document_generation:
+  model: "llama3.1-70b"
+  temperature: 0.7
+  max_tokens: 2000
+  parallel_limit: 10  # Max concurrent LLM calls
+

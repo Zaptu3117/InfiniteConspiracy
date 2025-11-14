@@ -1,0 +1,28 @@
+{
+  "cipher_types": {
+    "caesar": {
+      "name": "Caesar Cipher",
+      "key_fragments": 1,
+      "difficulty": "easy",
+      "description": "Simple shift cipher where key is a number"
+    },
+    "substitution": {
+      "name": "Substitution Cipher",
+      "key_fragments": 3,
+      "difficulty": "medium",
+      "description": "Alphabet mapping scattered across documents"
+    },
+    "vigenere": {
+      "name": "Vigenère Cipher",
+      "key_fragments": 2,
+      "difficulty": "hard",
+      "description": "Keyword-based polyalphabetic cipher"
+    }
+  },
+  "encryption_settings": {
+    "min_text_length_for_encryption": 50,
+    "encryption_percentage": 0.35,
+    "key_scatter_min_distance": 3
+  }
+}
+
