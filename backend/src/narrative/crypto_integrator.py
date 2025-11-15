@@ -3,7 +3,7 @@
 import logging
 import random
 from typing import List, Dict, Any
-from ..documents.cryptography import CipherManager
+from documents.cryptography import CipherManager
 
 
 logger = logging.getLogger(__name__)

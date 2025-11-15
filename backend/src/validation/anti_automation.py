@@ -8,8 +8,8 @@ This module validates that mysteries are:
 
 import logging
 from typing import List, Dict, Any
-from ..models import Mystery, ValidationResult, ValidationStep, ProofTree
-from ..utils import CerebrasClient
+from models import Mystery, ValidationResult, ValidationStep, ProofTree
+from utils import CerebrasClient
 
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class AntiAutomationValidator:
     async def _test_single_llm(self, mystery: Mystery) -> Dict[str, Any]:
         """
         Test if single LLM can solve the mystery with all documents.
-        Should FAIL for valid mysteries.
+        Should FAIL for valid mysteries (but must actually try to answer!).
         """
         # Combine all documents into one prompt
         docs_text = "\n\n".join([
@@ -110,14 +110,46 @@ ANSWER:"""
             response = await self.llm.generate(
                 prompt,
                 temperature=0.1,
-                max_tokens=100
+                max_tokens=500  # Increased to ensure complete response
             )
             
-            response = response.strip().lower()
-            answer = mystery.answer.strip().lower()
+            if not response:
+                logger.error("   ❌ Single-LLM test got EMPTY response - this is invalid!")
+                logger.error("   The LLM must attempt to answer (even if wrong).")
+                return {
+                    "response": "[EMPTY - INVALID TEST]",
+                    "correct": False,
+                    "error": "Empty response - LLM did not attempt to answer"
+                }
             
-            # Check if response contains the answer
-            correct = (answer in response) or (response in answer)
+            response = response.strip()
+            response_lower = response.lower()
+            answer_lower = mystery.answer.strip().lower()
+            
+            # DEBUG: Log comparison details
+            logger.info(f"   🔍 Single-LLM Comparison:")
+            logger.info(f"      Response: '{response}' (len={len(response)})")
+            logger.info(f"      Expected: '{mystery.answer}' (len={len(mystery.answer)})")
+            logger.info(f"      Response (lower): '{response_lower}'")
+            logger.info(f"      Expected (lower): '{answer_lower}'")
+            
+            # Check if response contains the answer (must have actual content!)
+            if len(response_lower) < 3:
+                logger.warning(f"   ⚠️  Very short response: '{response}'")
+                correct = False
+            else:
+                test1 = answer_lower in response_lower
+                test2 = response_lower in answer_lower
+                correct = test1 or (test2 and len(response_lower) > 3)
+                logger.info(f"      Test 1 (answer in response): {test1}")
+                logger.info(f"      Test 2 (response in answer): {test2}")
+                logger.info(f"      Final correct: {correct}")
+            
+            # Log what we got
+            if correct:
+                logger.error(f"   ❌ Single-LLM FOUND the answer! Mystery is TOO EASY!")
+            else:
+                logger.info(f"   ✅ Single-LLM did NOT find answer (GOOD!)")
             
             return {
                 "response": response,
@@ -127,8 +159,9 @@ ANSWER:"""
         except Exception as e:
             logger.error(f"Single-LLM test error: {e}")
             return {
-                "response": "",
-                "correct": False
+                "response": f"[ERROR: {str(e)}]",
+                "correct": False,
+                "error": str(e)
             }
     
     async def _test_multi_hop(self, mystery: Mystery) -> Dict[str, Any]:
@@ -184,8 +217,12 @@ ANSWER:"""
                 response = await self.llm.generate(
                     prompt,
                     temperature=0.1,
-                    max_tokens=200
+                    max_tokens=500
                 )
+                
+                # Safety: handle None responses
+                if response is None:
+                    response = ""
                 
                 response = response.strip()
                 
@@ -235,14 +272,24 @@ ANSWER:"""
     def _format_document(self, doc: Dict[str, Any]) -> str:
         """Format document for LLM prompt."""
         import json
-        fields = doc.get("fields", {})
-        return json.dumps(fields, indent=2)
+        
+        # Remove document_id and document_type for cleaner presentation
+        doc_copy = {k: v for k, v in doc.items() if k not in ['document_id', 'document_type']}
+        
+        # Format as readable JSON
+        return json.dumps(doc_copy, indent=2)
     
     def _check_inference_match(self, response: str, expected: str) -> bool:
         """
         Check if LLM response matches expected inference.
         Uses fuzzy matching for flexibility.
         """
+        # Safety: handle None
+        if response is None:
+            response = ""
+        if expected is None:
+            expected = ""
+        
         response = response.lower().strip()
         expected = expected.lower().strip()
         

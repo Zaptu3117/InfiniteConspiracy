@@ -5,7 +5,7 @@ from typing import Dict, Any
 from web3 import Web3
 
 from .web3_client import Web3Client
-from ..models import Mystery
+from models import Mystery
 
 
 logger = logging.getLogger(__name__)

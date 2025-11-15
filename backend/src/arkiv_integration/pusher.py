@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .client import ArkivClient
 from .entity_builder import EntityBuilder
-from ..models import Mystery
+from models import Mystery
 
 
 logger = logging.getLogger(__name__)

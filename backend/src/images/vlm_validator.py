@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Dict, Any
-from ..utils import OpenAIClient
+from utils import OpenAIClient
 
 
 logger = logging.getLogger(__name__)

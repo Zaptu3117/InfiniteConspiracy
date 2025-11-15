@@ -32,7 +32,7 @@ async def test_cerebras():
         response = await client.generate(
             "Say 'Hello from Cerebras!' in exactly 5 words.",
             temperature=0.7,
-            max_tokens=20
+            max_tokens=100  # Increased from 20 to avoid truncation
         )
         logger.info(f"✅ Response: {response}")
         
@@ -41,7 +41,7 @@ async def test_cerebras():
         json_response = await client.generate_json(
             "Generate a JSON object with 'name' and 'age' fields for a fictional character.",
             temperature=0.7,
-            max_tokens=100
+            max_tokens=200  # Increased from 100
         )
         logger.info(f"✅ JSON: {json_response}")
         

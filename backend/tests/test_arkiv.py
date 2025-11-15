@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Test Arkiv SDK integration."""
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -8,11 +9,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from utils import load_config, setup_logger
-from arkiv import ArkivClient
+from arkiv_integration import ArkivClient
 
 
-def test_arkiv_connection():
-    """Test Arkiv client connection."""
+async def test_arkiv_connection():
+    """Test Arkiv client connection (async)."""
     config = load_config()
     logger = setup_logger("test_arkiv", "INFO", config.log_dir)
     
@@ -25,38 +26,41 @@ def test_arkiv_connection():
         return False
     
     try:
-        with ArkivClient(
+        async with ArkivClient(
             private_key=config.arkiv_private_key,
-            rpc_url=config.arkiv_rpc_url,
-            account_name="test_mystery_oracle"
+            rpc_url=config.arkiv_rpc_url
         ) as client:
             logger.info("✅ Arkiv client initialized")
             
             # Test 1: Create a test entity
             logger.info("\nTest 1: Creating test entity...")
             test_data = b"Test entity for Arkiv integration"
-            entity_key, _ = client.create_entity(
+            entity_key = await client.create_entity(
                 payload=test_data,
                 content_type="text/plain",
                 attributes={"type": "test", "purpose": "integration_test"},
-                btl=120  # 120 blocks TTL
+                expires_in=43200  # 12 hours
             )
             logger.info(f"✅ Created entity: {entity_key}")
             
             # Test 2: Retrieve entity
             logger.info("\nTest 2: Retrieving entity...")
-            entity = client.get_entity(entity_key)
-            retrieved_data = (entity.payload or b"").decode("utf-8", errors="ignore")
-            logger.info(f"✅ Retrieved data: {retrieved_data}")
-            
-            if retrieved_data != test_data.decode():
-                logger.error("❌ Data mismatch!")
+            entity = await client.get_entity(entity_key)
+            if entity:
+                retrieved_data = (entity.payload or b"").decode("utf-8", errors="ignore")
+                logger.info(f"✅ Retrieved data: {retrieved_data}")
+                
+                if retrieved_data != test_data.decode():
+                    logger.error("❌ Data mismatch!")
+                    return False
+            else:
+                logger.error("❌ Could not retrieve entity")
                 return False
             
             # Test 3: Query entities
             logger.info("\nTest 3: Querying entities...")
             query = 'type = "test" and purpose = "integration_test"'
-            entities = client.query_entities(query, limit=10)
+            entities = await client.query_entities(query)
             logger.info(f"✅ Found {len(entities)} test entities")
             
             logger.info("\n✅ All Arkiv tests passed!")
@@ -69,12 +73,12 @@ def test_arkiv_connection():
         return False
 
 
-def main():
+async def main():
     """Run Arkiv tests."""
     print("🧪 Arkiv SDK Test Suite")
     print("="*60)
     
-    passed = test_arkiv_connection()
+    passed = await test_arkiv_connection()
     
     print("\n" + "="*60)
     print("📊 Test Summary")
@@ -85,5 +89,5 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(asyncio.run(main()))
 

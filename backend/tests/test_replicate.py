@@ -38,13 +38,16 @@ async def test_image_generation():
         output_dir = config.outputs_dir / "test_images"
         output_dir.mkdir(exist_ok=True, parents=True)
         
-        image_path = await generator.generate_image(
+        # generate_image returns a dict with 'path' key
+        result = await generator.generate_image(
             prompt="A mysterious detective examining a document",
-            output_dir=output_dir,
-            filename="test_detective.png"
+            image_id="test_detective",
+            output_dir=output_dir
         )
         
-        if image_path and image_path.exists():
+        if result and result.get("path"):
+            from pathlib import Path
+            image_path = Path(result["path"])
             logger.info(f"✅ Image generated: {image_path}")
             logger.info(f"   Size: {image_path.stat().st_size / 1024:.2f} KB")
             logger.info("\n✅ Replicate test passed!")

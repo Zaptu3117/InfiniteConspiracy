@@ -1,14 +1,17 @@
 """LLM client wrappers for Cerebras and OpenAI."""
 
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List
 from openai import AsyncOpenAI
 import httpx
 
+logger = logging.getLogger(__name__)
+
 class CerebrasClient:
-    """Wrapper for Cerebras API (llama3.1-120b)."""
+    """Wrapper for Cerebras API (gpt-oss-120b)."""
     
-    def __init__(self, api_key: str, model: str = "llama3.1-70b"):
+    def __init__(self, api_key: str, model: str = "gpt-oss-120b"):
         self.api_key = api_key
         self.model = model
         self.base_url = "https://api.cerebras.ai/v1"
@@ -22,40 +25,55 @@ class CerebrasClient:
         prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 8000,
+        max_retries: int = 5,
         **kwargs
     ) -> str:
         """
-        Generate text using Cerebras LLM.
+        Generate text using Cerebras LLM with retry logic.
         
         Args:
             prompt: Input prompt
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            max_retries: Maximum number of retry attempts for rate limits
         
         Returns:
             Generated text
         """
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            raise Exception(f"Cerebras API error: {str(e)}")
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                error_str = str(e)
+                # Check if it's a rate limit error (429)
+                if "429" in error_str or "rate" in error_str.lower() or "quota" in error_str.lower():
+                    if attempt < max_retries - 1:
+                        wait_time = (2 ** attempt) + (attempt * 0.5)  # Exponential backoff with jitter
+                        logger.warning(f"   ⚠️  Rate limit hit, retrying in {wait_time:.1f}s (attempt {attempt + 1}/{max_retries})...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                raise Exception(f"Cerebras API error: {error_str}")
     
     async def generate_json(
         self,
         prompt: str,
         temperature: float = 0.7,
-        max_tokens: int = 8000
+        max_tokens: int = 8000,
+        max_retries: int = 5
     ) -> Dict[str, Any]:
-        """Generate JSON output."""
+        """Generate JSON output with retry logic."""
         import json
-        response = await self.generate(prompt, temperature, max_tokens)
+        response = await self.generate(prompt, temperature, max_tokens, max_retries)
+        
+        if not response:
+            raise ValueError("Empty response from LLM")
         
         # Extract JSON from response (handle markdown code blocks)
         response = response.strip()
@@ -66,7 +84,17 @@ class CerebrasClient:
         if response.endswith("```"):
             response = response[:-3]
         
-        return json.loads(response.strip())
+        response = response.strip()
+        
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError as e:
+            # Log the actual response for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to parse JSON. Response preview: {response[:500]}...")
+            logger.error(f"JSON error at position {e.pos}: {e.msg}")
+            raise ValueError(f"Invalid JSON response: {e.msg}. Try increasing max_tokens or simplifying the prompt.")
 
 
 class OpenAIClient:
@@ -101,7 +129,7 @@ class OpenAIClient:
         self,
         image_url: str,
         required_elements: List[str],
-        model: str = "gpt-4-vision-preview"
+        model: str = "gpt-4o"
     ) -> Dict[str, Any]:
         """
         Use GPT-4V to validate image contains required elements.

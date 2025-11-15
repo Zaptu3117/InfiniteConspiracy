@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Dict, Any
-from ..graph import Character
+from narrative.graph import Character
 
 
 logger = logging.getLogger(__name__)

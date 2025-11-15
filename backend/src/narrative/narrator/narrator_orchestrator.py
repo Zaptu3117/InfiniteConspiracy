@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, Any
-from ..graph import NarrativeGraph
+from narrative.graph import NarrativeGraph
 from .step_minus1_premise import PremiseGenerator
 from .step0_proof_tree import ProofTreeGenerator
 from .step1_characters import CharacterGenerator

@@ -3,7 +3,7 @@
 import logging
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-from ..graph import Character, TimelineEvent
+from narrative.graph import Character, TimelineEvent
 
 
 logger = logging.getLogger(__name__)

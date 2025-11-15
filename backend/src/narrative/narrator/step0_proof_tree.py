@@ -2,6 +2,7 @@
 
 import logging
 from typing import Dict, Any, List
+from .identity_injector import IdentityInjector
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,37 @@ Difficulty: {difficulty}/10
 YOUR TASK:
 Design a proof tree with {num_hops} inference nodes that connect evidence to the answer.
 
+CRITICAL RULES FOR EVIDENCE NODES (no parents):
+
+1. **USE INDIRECT IDENTIFIERS - NEVER THE ANSWER NAME!**
+   - ❌ BAD: "John Smith accessed the building at 2:30 AM" (reveals answer!)
+   - ✅ GOOD: "User ID 'jsmith' accessed the building at 2:30 AM" (obfuscated)
+   - ✅ GOOD: "Badge #45123 scanned at entrance at 2:30 AM" (indirect)
+
+2. **ONE IDENTIFIER PER NODE - KEEP THEM ATOMIC!**
+   - ❌ BAD: "User 'jsmith' (Badge #123) accessed from IP 192.168.1.42"
+   - ✅ GOOD: Create 3 SEPARATE nodes:
+     * Node A: "IP 192.168.1.42 accessed server at 2:30 AM"
+     * Node B: "User ID 'jsmith' logged in at 2:29 AM"
+     * Node C: "Employee directory: User 'jsmith' has badge #123"
+
+3. **SPLIT COMPLEX MAPPINGS INTO SEPARATE NODES!**
+   - ❌ BAD: "HR links user 'jsmith' to employee #5873, device D-123, and badge #456"
+   - ✅ GOOD: Create 3+ separate nodes:
+     * "Device D-123 registered in IT asset database"
+     * "Badge #456 issued to employee #5873"
+     * "User ID 'jsmith' is employee #5873"
+
+Use these identifier types:
+- User IDs (jsmith, mpatel, etc.)
+- Badge numbers (#12345)
+- IP addresses (192.168.x.x)
+- Device IDs (D-ABC123)
+- Employee numbers (#5873)
+- Session/Request IDs
+
 RULES:
-1. Start with direct observations from evidence (no parents)
+1. Start with direct observations from evidence (no parents) - USE INDIRECT IDs!
 2. Build up to higher-level inferences (with parents)
 3. Final nodes should lead to the answer
 4. Each node requires 1-3 documents as evidence
@@ -37,30 +67,51 @@ INFERENCE NODE STRUCTURE:
 - document_ids: List of document IDs needed (use generic like ["doc_1", "doc_2"])
 - parent_nodes: List of node_ids that must be resolved first (empty for evidence-level nodes)
 
-EXAMPLE STRUCTURE (3 hops):
+EXAMPLE STRUCTURE (5 hops - CORRECT WAY WITH ATOMIC NODES):
 {{
   "answer": "John Smith",
   "inference_nodes": [
     {{
       "node_id": "node_1",
-      "inference": "Someone accessed the building at 2:30 AM",
+      "inference": "IP 192.168.1.42 accessed server files at 2:30 AM",
+      "reasoning_type": "direct_observation",
+      "document_ids": ["doc_server_log"],
+      "parent_nodes": []
+    }},
+    {{
+      "node_id": "node_2",
+      "inference": "Badge #45123 scanned at server room door at 2:28 AM",
       "reasoning_type": "direct_observation",
       "document_ids": ["doc_badge_log"],
       "parent_nodes": []
     }},
     {{
-      "node_id": "node_2",
-      "inference": "John Smith sent an email mentioning a late-night meeting",
+      "node_id": "node_3",
+      "inference": "User ID 'jsmith' logged in from IP 192.168.1.42 at 2:25 AM",
       "reasoning_type": "direct_observation",
-      "document_ids": ["doc_email"],
+      "document_ids": ["doc_network_log"],
       "parent_nodes": []
     }},
     {{
-      "node_id": "node_3",
-      "inference": "John Smith was the person who accessed the building",
+      "node_id": "node_4",
+      "inference": "Employee #5873 has badge #45123",
+      "reasoning_type": "direct_observation",
+      "document_ids": ["doc_hr_badges"],
+      "parent_nodes": []
+    }},
+    {{
+      "node_id": "node_5",
+      "inference": "Employee directory shows employee #5873 is John Smith with user ID 'jsmith'",
+      "reasoning_type": "direct_observation",
+      "document_ids": ["doc_hr_directory"],
+      "parent_nodes": []
+    }},
+    {{
+      "node_id": "node_6",
+      "inference": "John Smith accessed the server room and files at 2:25-2:30 AM",
       "reasoning_type": "cross_reference",
-      "document_ids": ["doc_badge_log", "doc_email"],
-      "parent_nodes": ["node_1", "node_2"]
+      "document_ids": ["doc_server_log", "doc_badge_log", "doc_network_log", "doc_hr_badges", "doc_hr_directory"],
+      "parent_nodes": ["node_1", "node_2", "node_3", "node_4", "node_5"]
     }}
   ]
 }}
@@ -79,6 +130,7 @@ class ProofTreeGenerator:
     
     def __init__(self, llm_client):
         self.llm = llm_client
+        self.identity_injector = IdentityInjector()
     
     async def generate_proof_tree(
         self,
@@ -121,11 +173,17 @@ class ProofTreeGenerator:
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 2500)
+                max_tokens=config.get("max_tokens", 8000)  # Increased for more hops!
             )
             
             # Validate structure
             proof_tree = self._validate_and_enhance(response, question, answer, num_hops)
+            
+            # CRITICAL: Inject missing identity nodes programmatically!
+            proof_tree = self.identity_injector.inject_identity_nodes(proof_tree, answer)
+            
+            # Rebuild validation steps after injection
+            proof_tree["validation_steps"] = self._build_validation_steps(proof_tree["inference_nodes"])
             
             logger.info(f"   ✅ Generated {len(proof_tree['inference_nodes'])} inference nodes")
             
@@ -139,23 +197,33 @@ class ProofTreeGenerator:
         except Exception as e:
             logger.error(f"   ❌ Proof tree generation failed: {e}")
             # Fallback to simple proof tree
-            return self._create_fallback_proof_tree(question, answer, num_hops)
+            fallback = self._create_fallback_proof_tree(question, answer, num_hops)
+            # Still apply identity injection even to fallback!
+            fallback = self.identity_injector.inject_identity_nodes(fallback, answer)
+            fallback["validation_steps"] = self._build_validation_steps(fallback["inference_nodes"])
+            return fallback
     
     def _calculate_hops(self, difficulty: int) -> int:
-        """Calculate number of hops based on difficulty."""
-        # Difficulty 1-3: 3 hops
-        # Difficulty 4-6: 4-5 hops
-        # Difficulty 7-8: 6 hops
-        # Difficulty 9-10: 7 hops
+        """
+        Calculate number of hops based on difficulty.
+        
+        Since we now require ATOMIC clues (one identifier per node),
+        we need MORE nodes to complete the reasoning chain!
+        """
+        # With atomic clues, we need more nodes for same difficulty
+        # Difficulty 1-3: 5-6 evidence nodes
+        # Difficulty 4-6: 7-9 evidence nodes
+        # Difficulty 7-8: 10-12 evidence nodes
+        # Difficulty 9-10: 13-15 evidence nodes
         
         if difficulty <= 3:
-            return 3
+            return 5 + difficulty  # 6-8 total
         elif difficulty <= 6:
-            return 4 + (difficulty - 4) // 2
+            return 7 + (difficulty - 3)  # 8-11 total
         elif difficulty <= 8:
-            return 6
+            return 11 + (difficulty - 6)  # 12-14 total
         else:
-            return 7
+            return 14 + (difficulty - 8)  # 15-17 total
     
     def _validate_and_enhance(
         self,

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 from web3 import AsyncWeb3, AsyncHTTPProvider
-from web3.middleware import async_geth_poa_middleware
+from web3.middleware import ExtraDataToPOAMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class Web3Client:
         self.w3 = AsyncWeb3(AsyncHTTPProvider(rpc_url))
         
         # Add PoA middleware for networks like Kusama/Polkadot EVM
-        self.w3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
+        self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         
         # Set up account
         self.private_key = private_key if private_key.startswith('0x') else f'0x{private_key}'

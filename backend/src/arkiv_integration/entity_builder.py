@@ -2,7 +2,7 @@
 
 import json
 from typing import Dict, Any, List
-from ..models import Mystery
+from models import Mystery
 
 
 class EntityBuilder:

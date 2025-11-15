@@ -4,14 +4,15 @@ import logging
 from typing import Dict, Any
 from pathlib import Path
 
-from ..models import Mystery, MysteryMetadata
+from models import Mystery, MysteryMetadata
 from .narrator import NarratorOrchestrator
 from .document_gen import ParallelDocumentGenerator
 from .graph import NarrativeGraph
 from .crypto_integrator import CryptoIntegrator
 from .red_herrings import RedHerringGenerator
-from ..images import ImageGenerator, VLMValidator
-from ..utils import OpenAIClient
+from images import ImageGenerator, VLMValidator
+from utils import OpenAIClient
+from validation.anti_automation import AntiAutomationValidator
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +154,27 @@ class LLMNarrativePipeline:
         logger.info(f"   Images: {len(mystery.images)} (planned)")
         logger.info("")
         
+        # STEP 5: ANTI-AUTOMATION VALIDATION
+        logger.info("="*60)
+        logger.info("🔍 ANTI-AUTOMATION VALIDATION")
+        logger.info("="*60)
+        logger.info("")
+        
+        validation_result = await self._validate_mystery(mystery)
+        
+        # Update mystery with validation results
+        mystery.validation_passed = validation_result.is_valid
+        mystery.validation_details = validation_result.to_dict()
+        
+        if not validation_result.is_valid:
+            logger.warning(f"   ⚠️  Validation failed: {validation_result.reason}")
+            logger.warning("   Mystery may be too easy or too hard!")
+        else:
+            logger.info("   ✅ Validation passed!")
+            logger.info("   ✓ Single-LLM cannot solve it")
+            logger.info("   ✓ Multi-hop reasoning can solve it")
+        
+        logger.info("")
         logger.info("="*60)
         logger.info("✅ LLM GENERATION COMPLETE!")
         logger.info("="*60)
@@ -282,11 +304,14 @@ class LLMNarrativePipeline:
             total_images=len(images)
         )
         
+        # FIX: Map proof tree generic IDs to actual generated document IDs
+        proof_tree_fixed = self._fix_proof_tree_document_ids(proof_tree, documents)
+        
         # Create mystery
         mystery = Mystery(
             metadata=metadata,
             answer=answer,
-            proof_tree=proof_tree,
+            proof_tree=proof_tree_fixed,
             documents=documents,
             images=images,
             validation_passed=True,  # Would need validation step
@@ -303,4 +328,107 @@ class LLMNarrativePipeline:
         mystery.generate_hashes()
         
         return mystery
+    
+    def _fix_proof_tree_document_ids(self, proof_tree: Dict[str, Any], documents: list) -> Dict[str, Any]:
+        """
+        Fix proof tree document IDs to match actual generated documents.
+        
+        The proof tree uses generic/semantic IDs like 'doc_email' or 'doc_version_history',
+        but actual documents have IDs like 'doc_1_email_megan' or 'doc_2_memo_torres_edit'.
+        
+        This function maps generic IDs to actual document IDs based on document types and content.
+        """
+        import json
+        import copy
+        
+        proof_tree = copy.deepcopy(proof_tree)
+        
+        # Build mapping of generic ID → actual document ID
+        id_mapping = {}
+        
+        # Get all generic IDs referenced in proof tree
+        generic_ids = set()
+        for node in proof_tree.get("inference_nodes", []):
+            generic_ids.update(node.get("document_ids", []))
+        
+        logger.info(f"   🔧 Fixing proof tree document IDs...")
+        logger.info(f"   Generic IDs in proof tree: {list(generic_ids)}")
+        
+        # Try to map each generic ID to an actual document
+        for generic_id in generic_ids:
+            best_match = None
+            best_score = 0
+            
+            for doc in documents:
+                actual_id = doc.get("document_id", "")
+                doc_type = doc.get("document_type", "")
+                doc_str = json.dumps(doc).lower()
+                
+                score = 0
+                
+                # Check if generic ID hints at document type
+                if "email" in generic_id and doc_type == "email":
+                    score += 3
+                elif "memo" in generic_id and doc_type == "internal_memo":
+                    score += 3
+                elif "badge" in generic_id and doc_type == "badge_log":
+                    score += 3
+                elif "log" in generic_id and "log" in doc_type:
+                    score += 2
+                elif "report" in generic_id and "report" in doc_type:
+                    score += 2
+                
+                # Check if generic ID contains keywords found in document
+                generic_keywords = generic_id.replace("doc_", "").split("_")
+                for keyword in generic_keywords:
+                    if len(keyword) > 3 and keyword in doc_str:
+                        score += 1
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = actual_id
+            
+            if best_match:
+                id_mapping[generic_id] = best_match
+                logger.info(f"      {generic_id} → {best_match}")
+            else:
+                # Fallback: use first document of similar type
+                logger.warning(f"      {generic_id} → no good match, using first document")
+                if documents:
+                    id_mapping[generic_id] = documents[0].get("document_id", generic_id)
+        
+        # Update all document_ids in proof tree
+        for node in proof_tree.get("inference_nodes", []):
+            old_ids = node.get("document_ids", [])
+            new_ids = [id_mapping.get(old_id, old_id) for old_id in old_ids]
+            node["document_ids"] = new_ids
+        
+        # Update validation steps too
+        for step in proof_tree.get("validation_steps", []):
+            old_ids = step.get("required_document_ids", [])
+            new_ids = [id_mapping.get(old_id, old_id) for old_id in old_ids]
+            step["required_document_ids"] = new_ids
+        
+        return proof_tree
+    
+    async def _validate_mystery(self, mystery: Mystery):
+        """Validate that mystery requires multi-hop reasoning."""
+        validator = AntiAutomationValidator(self.llm)
+        
+        logger.info("Test 1: Single-LLM attempt (should FAIL)...")
+        logger.info("   Giving LLM all documents at once...")
+        
+        # Run validation
+        result = await validator.validate_mystery(mystery)
+        
+        # Log results
+        logger.info("")
+        logger.info("📊 Validation Summary:")
+        logger.info(f"   Single-LLM found answer: {result.single_llm_got_answer}")
+        logger.info(f"   Single-LLM response: {result.single_llm_response}")
+        logger.info(f"   Multi-hop reached answer: {result.multi_hop_reached_answer}")
+        logger.info(f"   Multi-hop steps passed: {sum(1 for s in result.multi_hop_steps if s.matches)}/{len(result.multi_hop_steps)}")
+        logger.info("")
+        
+        return result
 

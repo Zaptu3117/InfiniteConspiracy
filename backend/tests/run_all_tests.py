@@ -55,7 +55,7 @@ async def main():
     print("\n📍 Test Suite 2/4: Arkiv SDK")
     try:
         from test_arkiv import test_arkiv_connection
-        results['arkiv'] = test_arkiv_connection()
+        results['arkiv'] = await test_arkiv_connection()
     except Exception as e:
         print(f"❌ Arkiv test failed to import: {e}")
         results['arkiv'] = False

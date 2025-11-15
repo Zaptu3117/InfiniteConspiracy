@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Any
 import json
 
-from ..graph import NarrativeGraph, DocumentPlan, Character
+from narrative.graph import NarrativeGraph, DocumentPlan, Character
 from .document_prompts import get_document_prompt_template
 
 
@@ -139,6 +139,9 @@ class ParallelDocumentGenerator:
             # Validate clues present
             self._validate_clues_present(content, doc_plan)
             
+            # CRITICAL: Validate information containment
+            self._validate_information_containment(content, doc_plan)
+            
             return content
         
         except Exception as e:
@@ -231,10 +234,11 @@ class ParallelDocumentGenerator:
         return prompt
     
     def _build_story_context(self, graph: NarrativeGraph, doc_plan: DocumentPlan) -> str:
-        """Build story context summary."""
+        """Build story context summary (WITHOUT revealing the mystery!)."""
         context_parts = []
         context_parts.append(f"Setting: Corporate/industrial environment")
-        context_parts.append(f"Mystery: {graph.mystery_question}")
+        # DO NOT include mystery question - documents should only contain raw evidence!
+        # context_parts.append(f"Mystery: {graph.mystery_question}")
         context_parts.append(f"Document purpose: {doc_plan.purpose}")
         return "\n".join(context_parts)
     
@@ -259,11 +263,15 @@ class ParallelDocumentGenerator:
         return "\n".join(lines)
     
     def _build_clues_list(self, clues: List) -> str:
-        """Build clues list string."""
+        """Build clues list string with strict evidence-only warning."""
         if not clues:
             return "No specific elements required"
         
-        lines = []
+        lines = [
+            "⚠️ CRITICAL: ONLY include RAW EVIDENCE below - NO conclusions, NO answers!",
+            "Example RAW EVIDENCE: 'User ID xyz123 at 10:03 PM' (NOT 'John Smith deleted files')",
+            ""
+        ]
         for clue in clues:
             lines.append(f"- Include: {clue.clue_data} (in field: {clue.field_to_insert})")
         return "\n".join(lines)
@@ -329,8 +337,67 @@ class ParallelDocumentGenerator:
         
         for clue in doc_plan.clues_to_include:
             clue_data_lower = clue.clue_data.lower()
-            if clue_data_lower not in content_str:
+            
+            # Extract key terms from the clue (words longer than 4 characters)
+            key_terms = [word for word in clue_data_lower.split() if len(word) > 4 and word.isalnum()]
+            
+            # Check if at least 50% of key terms are present (more lenient)
+            if key_terms:
+                present_count = sum(1 for term in key_terms if term in content_str)
+                if present_count / len(key_terms) < 0.5:
+                    logger.warning(
+                        f"   ⚠️  Clue '{clue.clue_data}' may be missing or paraphrased in {doc_plan.doc_id}"
+                    )
+            elif clue_data_lower not in content_str:
+                # Fallback to exact match for short clues
                 logger.warning(
                     f"   ⚠️  Clue '{clue.clue_data}' not found in {doc_plan.doc_id}"
                 )
+    
+    def _validate_information_containment(self, content: Dict[str, Any], doc_plan: DocumentPlan):
+        """
+        CRITICAL: Check if document is leaking TOO MUCH information.
+        Each document should contain ONLY small fragments, not connected chains.
+        """
+        content_str = json.dumps(content).lower()
+        
+        # Extract all technical identifiers that might be in the document
+        import re
+        
+        # Find user IDs (patterns like: userid, user_id, jsmith, mpatel, lramirez)
+        user_ids = re.findall(r'\b[a-z]+\d*[a-z]*\b(?=\s+(?:logged|accessed|initiated|executed|deleted))', content_str)
+        
+        # Find IPs
+        ips = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', content_str)
+        
+        # Find badge numbers
+        badges = re.findall(r'(?:badge|badge_number|badge_id)\s*[#:]?\s*["\']?(\d+|[A-Z]?\d+)', content_str)
+        
+        # Find session IDs, request IDs, transaction IDs
+        session_ids = re.findall(r'(?:session|request|transaction|ticket)\s*[#:]?\s*["\']?([A-Z0-9\-]+)', content_str)
+        
+        # Check for dangerous combinations in the SAME document
+        warnings = []
+        
+        # DANGER: User ID + IP in same doc (direct connection!)
+        if len(user_ids) > 0 and len(ips) > 0:
+            warnings.append(f"⚠️  Contains BOTH user ID ({user_ids[0]}) AND IP ({ips[0]}) - TOO CONNECTED!")
+        
+        # DANGER: User ID + Badge in same doc
+        if len(user_ids) > 0 and len(badges) > 0:
+            warnings.append(f"⚠️  Contains BOTH user ID ({user_ids[0]}) AND badge ({badges[0]}) - TOO CONNECTED!")
+        
+        # DANGER: Multiple linking identifiers (session + user + IP)
+        if len(session_ids) > 0 and len(user_ids) > 0 and len(ips) > 0:
+            warnings.append(f"⚠️  Contains Session + User + IP - COMPLETE CHAIN IN ONE DOC!")
+        
+        # Log warnings
+        if warnings:
+            logger.error(f"   🚨 CONTAINMENT VIOLATION in {doc_plan.doc_id}:")
+            for warning in warnings:
+                logger.error(f"      {warning}")
+            logger.error(f"      This document reveals too much! Should be split into multiple docs.")
+            logger.error(f"      Single-LLM will likely solve this mystery easily!")
+        
+        return len(warnings) == 0
 
