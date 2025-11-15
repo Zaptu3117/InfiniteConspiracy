@@ -29,19 +29,33 @@ CONSPIRACY CONTEXT (for background only - DO NOT reveal directly):
 POLITICAL CONTEXT:
 {political_summary}
 
-YOUR TASK:
-Generate a realistic, VERBOSE {doc_type} that contains the following evidence fragments:
+═══════════════════════════════════════════════════════════════
+⚠️  CRITICAL REQUIREMENT - VALIDATION WILL FAIL WITHOUT THESE ⚠️
+═══════════════════════════════════════════════════════════════
 
-EVIDENCE TO INCLUDE:
+YOU MUST INCLUDE THE FOLLOWING EVIDENCE IN THIS DOCUMENT.
+These are NOT suggestions - they are MANDATORY inclusions.
+The document will be REJECTED if any evidence is missing.
+
+EVIDENCE YOU MUST INCLUDE (copy exact values):
 {evidence_list}
 
+HOW TO INCLUDE EVIDENCE:
+- For IPs/IDs/numbers: Use the EXACT values shown above
+- For names/identifiers: Include them VERBATIM
+- For timestamps: Use the exact times or reference them
+- For crypto key hints: Include the COMPLETE phrase
+- Weave them naturally into the document content
+
+═══════════════════════════════════════════════════════════════
+
 CRITICAL CONSTRAINTS:
-1. Include ONLY the evidence fragments listed above
-2. DO NOT add conclusions or connect the dots
-3. Make it feel like a real document from this world
-4. Evidence should feel natural, not forced
-5. DO NOT reveal the conspiracy directly
-6. Use appropriate tone/format for {doc_type}
+1. ✅ INCLUDE ALL evidence listed above (mandatory for validation)
+2. ❌ DO NOT add conclusions or connect the dots
+3. ✅ Make it feel like a real document from this world
+4. ✅ Evidence should feel natural, not forced
+5. ❌ DO NOT reveal the conspiracy directly
+6. ✅ Use appropriate tone/format for {doc_type}
 7. **VERBOSITY REQUIREMENT**: Generate DETAILED content
    - Technical logs: 8-12 log entries with timestamps, system messages, debug info
    - Emails/memos: 2-4 paragraphs, conversational, detailed context
@@ -354,13 +368,11 @@ class ConstrainedDocumentGenerator:
             batch = tasks[i:i+batch_size]
             logger.info(f"   Generating batch {i//batch_size + 1}/{(len(tasks)-1)//batch_size + 1}...")
             
-            batch_results = await asyncio.gather(*batch, return_exceptions=True)
+            # Don't catch exceptions - let them propagate to fail the entire mystery
+            batch_results = await asyncio.gather(*batch)
             
             for doc in batch_results:
-                if isinstance(doc, Exception):
-                    logger.error(f"   ❌ Document generation failed: {doc}")
-                else:
-                    documents.append(doc)
+                documents.append(doc)
             
             # Delay between batches to avoid rate limits
             if i + batch_size < len(tasks):
@@ -391,14 +403,11 @@ class ConstrainedDocumentGenerator:
         ]
         
         if not evidence_nodes:
-            logger.warning(f"   ⚠️  No evidence nodes for {assignment.document_id}")
-            return self._create_fallback_document(assignment)
+            logger.error(f"   ❌ CRITICAL: No evidence nodes for {assignment.document_id}")
+            raise Exception(f"No evidence nodes assigned to document {assignment.document_id} - cannot generate")
         
-        # Build evidence list
-        evidence_list = "\n".join([
-            f"- {node.content}"
-            for node in evidence_nodes
-        ])
+        # Build evidence list with EXTRACTED KEY VALUES
+        evidence_list = self._format_evidence_for_prompt(evidence_nodes, assignment.document_type)
         
         # Get author (character or system)
         author = self._select_author(assignment.document_type, characters)
@@ -412,30 +421,103 @@ class ConstrainedDocumentGenerator:
             political_context
         )
         
-        try:
-            # Generate with LLM
-            response = await self.llm.generate_json(
-                prompt,
-                temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 2000)
-            )
-            
-            # Apply phrase-level encryption if needed
-            if assignment.contains_encrypted_phrase:
-                response = self._apply_phrase_encryption(
-                    response,
-                    evidence_nodes,
-                    key_lookup
-                )
-            
-            # Validate constraints
-            self._validate_constraints(response, assignment, evidence_nodes)
-            
-            return response
+        # Retry logic for failed generation - NO FALLBACK
+        max_retries = config.get("max_retries", 5)  # Increased to 5 attempts
         
-        except Exception as e:
-            logger.error(f"   ❌ Document generation failed for {assignment.document_id}: {e}")
-            return self._create_fallback_document(assignment, evidence_nodes)
+        # LOG THE PROMPT (first attempt only)
+        if max_retries > 0:
+            logger.info(f"\n{'='*70}")
+            logger.info(f"PROMPT FOR {assignment.document_id}:")
+            logger.info(f"{'='*70}")
+            logger.info(prompt[:2000] + "..." if len(prompt) > 2000 else prompt)
+            logger.info(f"{'='*70}\n")
+        
+        for attempt in range(max_retries):
+            try:
+                # Generate with LLM
+                response = await self.llm.generate_json(
+                    prompt,
+                    temperature=config.get("temperature", 0.7),
+                    max_tokens=config.get("max_tokens", 2000)
+                )
+                
+                # LOG THE RESPONSE
+                import json
+                response_str = json.dumps(response, indent=2)
+                logger.info(f"\n{'='*70}")
+                logger.info(f"LLM RESPONSE FOR {assignment.document_id} (attempt {attempt+1}):")
+                logger.info(f"{'='*70}")
+                logger.info(response_str[:1500] + "..." if len(response_str) > 1500 else response_str)
+                logger.info(f"{'='*70}\n")
+                
+                # Apply phrase-level encryption if needed
+                if assignment.contains_encrypted_phrase:
+                    response = self._apply_phrase_encryption(
+                        response,
+                        evidence_nodes,
+                        key_lookup
+                    )
+                
+                # Validate constraints
+                self._validate_constraints(response, assignment, evidence_nodes)
+                
+                return response
+            
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"   ⚠️  Attempt {attempt + 1}/{max_retries} failed for {assignment.document_id}: {e}")
+                    logger.warning(f"      Retrying in {2 ** attempt} seconds...")
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s, 8s
+                else:
+                    # FAIL LOUDLY - do not use fallback
+                    logger.error(f"   ❌ CRITICAL: Document generation failed for {assignment.document_id} after {max_retries} attempts")
+                    logger.error(f"      Last error: {e}")
+                    logger.error(f"      This document is REQUIRED for mystery integrity!")
+                    raise Exception(f"Failed to generate required document {assignment.document_id}: {e}")
+    
+    def _format_evidence_for_prompt(self, evidence_nodes: List[EvidenceNode], doc_type: str = "document") -> str:
+        """Extract and format key values from evidence for prompt."""
+        import re
+        
+        formatted_lines = []
+        
+        for i, node in enumerate(evidence_nodes, 1):
+            # Extract key values based on evidence type
+            key_values = []
+            
+            if node.evidence_type.value == "identity":
+                # Extract IPs, IDs, numbers, MAC addresses, session IDs
+                ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', node.content)
+                macs = re.findall(r'\b([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b', node.content)
+                ids = re.findall(r'(?:VPN_|AST|WS-|#)([A-Z0-9]{4,})', node.content)
+                employees = re.findall(r'(?:Employee|Personnel|Director)\s+#?(\d+)', node.content)
+                
+                key_values.extend(ips)
+                key_values.extend(macs)
+                key_values.extend(ids)
+                key_values.extend(employees)
+            
+            elif node.evidence_type.value == "cryptographic":
+                # Extract crypto key hint phrases
+                if "Character backstory reveals:" in node.content:
+                    phrase = node.content.split("Character backstory reveals:")[-1].strip()
+                    key_values.append(phrase)
+            
+            # Build formatted entry
+            formatted_lines.append(f"\n{'='*60}")
+            formatted_lines.append(f"EVIDENCE ITEM #{i}:")
+            formatted_lines.append(f"{node.content}")
+            formatted_lines.append(f"{'='*60}")
+            
+            if key_values:
+                formatted_lines.append(f"\n⚠️  MANDATORY - Include these EXACT values:")
+                for val in key_values:
+                    formatted_lines.append(f"   → {val}")
+                formatted_lines.append(f"\nWeave them naturally into {doc_type} content.")
+            else:
+                formatted_lines.append(f"\n⚠️  Include the above evidence naturally in the document")
+        
+        return "\n".join(formatted_lines)
     
     def _build_document_prompt(
         self,
@@ -559,6 +641,12 @@ Setting: {political_context.time_period}
         if not crypto_nodes:
             return document
         
+        # Debug: Log key linking status
+        logger.debug(f"   🔐 Encrypting document with {len(crypto_nodes)} crypto nodes")
+        logger.debug(f"      Available keys: {len(key_lookup)}")
+        for key_id, key in key_lookup.items():
+            logger.debug(f"         Key {key_id} → unlocks {key.unlocks_node_id}")
+        
         # Apply encryption to each phrase
         fields = document.get("fields", {})
         
@@ -573,6 +661,7 @@ Setting: {political_context.time_period}
                 
                 if not crypto_key:
                     logger.warning(f"   ⚠️  No crypto key found for node {node.node_id}")
+                    logger.warning(f"      Available keys: {[k.unlocks_node_id for k in key_lookup.values()]}")
                     continue
                 
                 # Encrypt the phrase
@@ -594,44 +683,142 @@ Setting: {political_context.time_period}
         document["fields"] = fields
         return document
     
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text by replacing smart quotes/apostrophes with regular ones."""
+        # Replace all types of apostrophes and quotes with standard ASCII versions
+        replacements = {
+            ''': "'",  # Right single quotation mark
+            ''': "'",  # Left single quotation mark
+            '"': '"',  # Left double quotation mark
+            '"': '"',  # Right double quotation mark
+            '‐': '-',  # Hyphen
+            '–': '-',  # En dash
+            '—': '-',  # Em dash
+        }
+        for smart, regular in replacements.items():
+            text = text.replace(smart, regular)
+        return text
+    
     def _validate_constraints(
         self,
         document: Dict[str, Any],
         assignment: DocumentAssignment,
         evidence_nodes: List[EvidenceNode]
     ):
-        """Validate document meets constraints."""
+        """Validate document meets constraints - TYPE-SPECIFIC validation."""
         
-        # Check that evidence is present
         import json
-        doc_str = json.dumps(document).lower()
+        import re
+        doc_str = json.dumps(document)
+        # Normalize text to handle smart quotes/apostrophes
+        doc_str = self._normalize_text(doc_str)
+        doc_str_lower = doc_str.lower()
+        
+        missing_evidence = []
         
         for node in evidence_nodes:
-            # Check if key terms from evidence appear
-            key_terms = [word for word in node.content.lower().split() if len(word) > 4]
-            if key_terms:
-                present = any(term in doc_str for term in key_terms[:3])
-                if not present:
-                    logger.warning(f"   ⚠️  Evidence may be missing: {node.content[:50]}...")
+            present = False
+            
+            # TYPE 1: CRYPTOGRAPHIC - Strictest validation
+            if node.evidence_type.value == "cryptographic":
+                # For crypto key hints, check the EXACT inference phrase is present
+                if "Character backstory reveals:" in node.content:
+                    # Extract the key phrase (after the colon)
+                    key_phrase = node.content.split("Character backstory reveals:")[-1].strip()
+                    # Normalize the key phrase
+                    key_phrase_normalized = self._normalize_text(key_phrase)
+                    # MUST have 100% - players need the full phrase to decrypt!
+                    key_words = [w for w in key_phrase_normalized.lower().split() if len(w) > 3]
+                    if key_words:
+                        # Require ALL key words to be present (100%)
+                        matches = sum(1 for word in key_words if word in doc_str_lower)
+                        present = matches == len(key_words)
+                    else:
+                        # If no key words, check exact phrase
+                        present = key_phrase_normalized.lower() in doc_str_lower
+                
+                # For encrypted phrases, just check they exist (will be encrypted)
+                elif node.encrypted_phrase:
+                    present = True  # Will be encrypted by _apply_phrase_encryption
+                
+                else:
+                    # Other crypto evidence - use keyword matching
+                    key_terms = [word for word in node.content.lower().split() if len(word) > 4]
+                    if key_terms:
+                        present = any(term in doc_str_lower for term in key_terms[:3])
+            
+            # TYPE 2: IDENTITY - Extract and check for KEY VALUES
+            elif node.evidence_type.value == "identity":
+                # Use same extraction logic as prompt formatting
+                key_values = []
+                ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', node.content)
+                macs = re.findall(r'\b([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b', node.content)
+                ids = re.findall(r'(?:VPN_|AST|WS-|#)([A-Z0-9]{4,})', node.content)
+                employees = re.findall(r'(?:Employee|Personnel|Director)\s+#?(\d+)', node.content)
+                key_values.extend(ips)
+                key_values.extend(macs)
+                key_values.extend(ids)
+                key_values.extend(employees)
+                
+                if key_values:
+                    # Check if ALL extracted values are present in the document
+                    present = all(val.lower() in doc_str_lower for val in key_values)
+                else:
+                    # No extracted values - check if main identifier is present
+                    if node.identifier_value:
+                        present = node.identifier_value.lower() in doc_str_lower
+                    else:
+                        # Fall back to keyword matching
+                        key_terms = [word for word in node.content.lower().split() if len(word) > 4]
+                        if key_terms:
+                            present = any(term in doc_str_lower for term in key_terms[:3])
+            
+            # TYPE 3: PSYCHOLOGICAL - More flexible (semantic content)
+            elif node.evidence_type.value == "psychological":
+                # Extract key concepts from content
+                key_terms = [word for word in node.content.lower().split() if len(word) > 4]
+                if key_terms:
+                    # Require at least 2 key terms (more flexible than crypto)
+                    matches = sum(1 for term in key_terms[:5] if term in doc_str_lower)
+                    present = matches >= 2
+            
+            # DEFAULT: Keyword matching
+            else:
+                key_terms = [word for word in node.content.lower().split() if len(word) > 4]
+                if key_terms:
+                    present = any(term in doc_str_lower for term in key_terms[:3])
+            
+            if not present:
+                missing_evidence.append(f"{node.evidence_type.value.upper()}: {node.content[:80]}")
+        
+        # FAIL if evidence is missing (force retry)
+        if missing_evidence:
+            # LOG VALIDATION FAILURE
+            logger.warning(f"\n{'='*70}")
+            logger.warning(f"VALIDATION FAILED FOR {assignment.document_id}:")
+            logger.warning(f"{'='*70}")
+            logger.warning(f"Document content (first 1000 chars):")
+            logger.warning(doc_str[:1000])
+            logger.warning(f"\nMissing evidence:")
+            for ev in missing_evidence:
+                logger.warning(f"   - {ev}")
+            logger.warning(f"{'='*70}\n")
+            
+            error_msg = f"Evidence missing from document:\n"
+            for ev in missing_evidence:
+                error_msg += f"   - {ev}...\n"
+            raise ValueError(error_msg)
     
     def _create_fallback_document(
         self,
         assignment: DocumentAssignment,
         evidence_nodes: List[EvidenceNode] = None
     ) -> Dict[str, Any]:
-        """Create a fallback document if generation fails."""
-        
-        content = "Document content"
-        if evidence_nodes:
-            content = "\n".join([node.content for node in evidence_nodes])
-        
-        return {
-            "document_id": assignment.document_id,
-            "document_type": assignment.document_type,
-            "timestamp": self._generate_timestamp(),
-            "author": "Unknown",
-            "fields": {
-                "content": content
-            }
-        }
+        """
+        Fallback document creation - SHOULD NEVER BE CALLED.
+        If this is reached, something went very wrong with retries.
+        """
+        logger.error("   ❌ CRITICAL: Fallback document creation called - this should never happen!")
+        logger.error("      The retry logic should handle all failures.")
+        raise Exception(f"Fallback document attempted for {assignment.document_id} - mystery integrity compromised")
 
