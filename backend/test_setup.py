@@ -42,10 +42,10 @@ except Exception as e:
     tests.append(("models", False, str(e)))
 
 try:
-    from arkiv import ArkivClient, EntityBuilder, ArkivPusher
-    tests.append(("arkiv", True, ""))
+    from arkiv_integration import ArkivClient, EntityBuilder, ArkivPusher
+    tests.append(("arkiv_integration", True, ""))
 except Exception as e:
-    tests.append(("arkiv", False, str(e)))
+    tests.append(("arkiv_integration", False, str(e)))
 
 try:
     from blockchain import Web3Client, MysteryRegistrar, ProofManager
