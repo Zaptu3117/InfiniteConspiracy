@@ -139,7 +139,13 @@ contract InfiniteConspiracy is AccessControl, ReentrancyGuard {
     
     // ============ PLAYER SUBMISSION ============
     
-    function submitAnswer(bytes32 mysteryId, string calldata answer) 
+    function submitAnswer(
+        bytes32 mysteryId, 
+        string calldata who,      // Conspirator name
+        string calldata what,     // Operation name
+        string calldata where,    // Location
+        string calldata why       // Objective/outcome
+    ) 
         external 
         payable 
         nonReentrant 
@@ -163,8 +169,16 @@ contract InfiniteConspiracy is AccessControl, ReentrancyGuard {
         
         emit AnswerSubmitted(mysteryId, msg.sender, msg.value);
         
-        // Check answer
-        bytes32 hash = keccak256(abi.encodePacked(_toLower(answer)));
+        // Check answer - combine all 4 parts with pipe delimiter
+        bytes32 hash = keccak256(abi.encodePacked(
+            _toLower(who),
+            "|",
+            _toLower(what),
+            "|",
+            _toLower(where),
+            "|",
+            _toLower(why)
+        ));
         if (hash == mystery.answerHash) {
             _solveMystery(mysteryId, msg.sender);
         }

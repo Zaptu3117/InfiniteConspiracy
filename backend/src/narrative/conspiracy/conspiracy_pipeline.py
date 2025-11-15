@@ -9,6 +9,7 @@ import json
 from models.conspiracy import ConspiracyMystery
 from .political_context_generator import PoliticalContextGenerator
 from .conspiracy_generator import ConspiracyGenerator
+from .answer_template_generator import AnswerTemplateGenerator
 from .subgraph_generator import SubGraphGenerator
 from .nodes import (
     IdentityNodeGenerator,
@@ -44,6 +45,7 @@ class ConspiracyPipeline:
         # Initialize components
         self.political_gen = PoliticalContextGenerator(llm_client)
         self.conspiracy_gen = ConspiracyGenerator(llm_client)
+        self.answer_template_gen = AnswerTemplateGenerator()
         self.subgraph_gen = SubGraphGenerator()
         
         self.identity_gen = IdentityNodeGenerator()
@@ -108,9 +110,20 @@ class ConspiracyPipeline:
             config=self.config.get("conspiracy", {})
         )
         
-        # PHASE 3: Sub-Graph Generation
+        # PHASE 3: Answer Template Extraction (NEW)
         logger.info("="*60)
-        logger.info("PHASE 3: SUB-GRAPH GENERATION")
+        logger.info("PHASE 3: ANSWER TEMPLATE EXTRACTION")
+        logger.info("="*60)
+        answer_template = self.answer_template_gen.extract_from_premise(premise)
+        logger.info(f"   WHO: {answer_template.who}")
+        logger.info(f"   WHAT: {answer_template.what}")
+        logger.info(f"   WHERE: {answer_template.where}")
+        logger.info(f"   WHY: {answer_template.why}")
+        logger.info(f"   Hash: {answer_template.combined_hash[:16]}...")
+        
+        # PHASE 4: Sub-Graph Generation (renumbered)
+        logger.info("="*60)
+        logger.info("PHASE 4: SUB-GRAPH GENERATION")
         logger.info("="*60)
         subgraphs = self.subgraph_gen.generate_subgraphs(
             premise=premise,
@@ -200,6 +213,7 @@ class ConspiracyPipeline:
         mystery = self._package_mystery(
             political_context,
             premise,
+            answer_template,
             subgraphs,
             crypto_keys,
             assignments,
@@ -369,6 +383,7 @@ class ConspiracyPipeline:
         self,
         political_context,
         premise,
+        answer_template,
         subgraphs,
         crypto_keys,
         assignments,
@@ -387,6 +402,7 @@ class ConspiracyPipeline:
             mystery_id=mystery_id,
             political_context=political_context,
             premise=premise,
+            answer_template=answer_template,
             subgraphs=subgraphs,
             crypto_keys=crypto_keys,
             document_assignments=assignments,
@@ -475,7 +491,17 @@ class ConspiracyPipeline:
             f.write(f"**Mystery ID:** {mystery.mystery_id}\n\n")
             f.write(f"**World:** {mystery.political_context.world_name}\n\n")
             f.write(f"**Difficulty:** {mystery.difficulty}/10\n\n")
-            f.write(f"## The Conspiracy\n\n")
+            
+            # Answer Template (for smart contract submission)
+            if mystery.answer_template:
+                f.write(f"## Answer Template (Smart Contract Submission)\n\n")
+                f.write(f"**WHO:** {mystery.answer_template.who}\n\n")
+                f.write(f"**WHAT:** {mystery.answer_template.what}\n\n")
+                f.write(f"**WHERE:** {mystery.answer_template.where}\n\n")
+                f.write(f"**WHY:** {mystery.answer_template.why}\n\n")
+                f.write(f"**Combined Hash:** `{mystery.answer_template.combined_hash}`\n\n")
+            
+            f.write(f"## The Conspiracy (Full Details)\n\n")
             f.write(f"**WHO:** {mystery.premise.who[:200]}...\n\n")
             f.write(f"**WHAT:** {mystery.premise.what[:200]}...\n\n")
             f.write(f"**WHY:** {mystery.premise.why[:200]}...\n\n")

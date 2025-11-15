@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
+import hashlib
 
 
 class EvidenceType(Enum):
@@ -26,6 +27,35 @@ class AnswerDimension(Enum):
     WHAT = "what"  # The conspiracy goal
     WHY = "why"  # The motivation
     HOW = "how"  # The method
+
+
+@dataclass
+class MysteryAnswer:
+    """4-blank answer template for mystery submission."""
+    
+    # Canonical answers (extracted from premise)
+    who: str = ""          # Conspirator name (e.g., "Dr. Liora Vance")
+    what: str = ""         # Operation name (e.g., "Eclipse Veil")
+    where: str = ""        # Key location (e.g., "Ecliptic Nexus")
+    why: str = ""          # Objective (e.g., "Awaken Void Serpent")
+    
+    # Combined hash for contract
+    combined_hash: str = ""
+    
+    def generate_hash(self) -> str:
+        """Generate combined hash matching contract logic."""
+        combined = f"{self.who.lower()}|{self.what.lower()}|{self.where.lower()}|{self.why.lower()}"
+        return hashlib.sha256(combined.encode()).hexdigest()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "who": self.who,
+            "what": self.what,
+            "where": self.where,
+            "why": self.why,
+            "combined_hash": self.combined_hash
+        }
 
 
 @dataclass
@@ -341,6 +371,9 @@ class ConspiracyMystery:
     political_context: PoliticalContext
     premise: ConspiracyPremise
     
+    # Answer template (for submission)
+    answer_template: Optional[MysteryAnswer] = None
+    
     # Evidence structure
     subgraphs: List[SubGraph] = field(default_factory=list)
     crypto_keys: List[CryptoKey] = field(default_factory=list)
@@ -367,6 +400,7 @@ class ConspiracyMystery:
             "mystery_id": self.mystery_id,
             "political_context": self.political_context.to_dict(),
             "premise": self.premise.to_dict(),
+            "answer_template": self.answer_template.to_dict() if self.answer_template else None,
             "subgraphs": [sg.to_dict() for sg in self.subgraphs],
             "crypto_keys": [ck.to_dict() for ck in self.crypto_keys],
             "document_assignments": [da.to_dict() for da in self.document_assignments],

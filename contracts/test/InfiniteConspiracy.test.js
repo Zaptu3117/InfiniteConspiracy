@@ -130,8 +130,18 @@ describe("InfiniteConspiracy", function () {
 
   describe("Answer Submission", function () {
     const mysteryId = ethers.keccak256(ethers.toUtf8Bytes("mystery_001"));
-    const answer = "Sarah Martinez";
-    const answerHash = ethers.keccak256(ethers.toUtf8Bytes(answer.toLowerCase()));
+    
+    // 4-part answer
+    const who = "Sarah Martinez";
+    const what = "Operation Eclipse";
+    const where = "Harbor District";
+    const why = "Revenge";
+    
+    // Combined hash (matching contract logic)
+    const answerHash = ethers.keccak256(
+      ethers.toUtf8Bytes(`${who.toLowerCase()}|${what.toLowerCase()}|${where.toLowerCase()}|${why.toLowerCase()}`)
+    );
+    
     const proofHash = ethers.keccak256(ethers.toUtf8Bytes("{}"));
     const duration = 604800;
     const difficulty = 7;
@@ -157,7 +167,14 @@ describe("InfiniteConspiracy", function () {
       const cost = await contract.getSubmissionCost(player1.address, mysteryId);
       
       await expect(
-        contract.connect(player1).submitAnswer(mysteryId, "Wrong Answer", { value: cost })
+        contract.connect(player1).submitAnswer(
+          mysteryId, 
+          "Wrong Person", 
+          "Wrong Op", 
+          "Wrong Place", 
+          "Wrong Why", 
+          { value: cost }
+        )
       ).to.emit(contract, "AnswerSubmitted");
     });
 
@@ -165,7 +182,14 @@ describe("InfiniteConspiracy", function () {
       const cost = await contract.getSubmissionCost(player1.address, mysteryId);
       
       await expect(
-        contract.connect(player1).submitAnswer(mysteryId, answer, { value: cost })
+        contract.connect(player1).submitAnswer(
+          mysteryId, 
+          who, 
+          what, 
+          where, 
+          why, 
+          { value: cost }
+        )
       ).to.emit(contract, "MysterySolved")
         .withArgs(mysteryId, player1.address, await contract.getMystery(mysteryId).then(m => m.bountyPool));
 
@@ -179,13 +203,17 @@ describe("InfiniteConspiracy", function () {
       expect(cost1).to.equal(BASE_SUBMISSION_FEE); // 1 KSM
 
       // First submission
-      await contract.connect(player1).submitAnswer(mysteryId, "Wrong 1", { value: cost1 });
+      await contract.connect(player1).submitAnswer(
+        mysteryId, "Wrong 1", "Wrong 1", "Wrong 1", "Wrong 1", { value: cost1 }
+      );
 
       const cost2 = await contract.getSubmissionCost(player1.address, mysteryId);
       expect(cost2).to.equal(BASE_SUBMISSION_FEE + ethers.parseEther("1")); // 1 + 1² = 2 KSM
 
       // Second submission
-      await contract.connect(player1).submitAnswer(mysteryId, "Wrong 2", { value: cost2 });
+      await contract.connect(player1).submitAnswer(
+        mysteryId, "Wrong 2", "Wrong 2", "Wrong 2", "Wrong 2", { value: cost2 }
+      );
 
       const cost3 = await contract.getSubmissionCost(player1.address, mysteryId);
       expect(cost3).to.equal(BASE_SUBMISSION_FEE + ethers.parseEther("4")); // 1 + 2² = 5 KSM
@@ -195,7 +223,9 @@ describe("InfiniteConspiracy", function () {
       const initialPool = (await contract.getMystery(mysteryId)).bountyPool;
       const cost = await contract.getSubmissionCost(player1.address, mysteryId);
       
-      await contract.connect(player1).submitAnswer(mysteryId, "Wrong", { value: cost });
+      await contract.connect(player1).submitAnswer(
+        mysteryId, "Wrong", "Wrong", "Wrong", "Wrong", { value: cost }
+      );
       
       const newPool = (await contract.getMystery(mysteryId)).bountyPool;
       expect(newPool).to.equal(initialPool + cost);
@@ -207,7 +237,10 @@ describe("InfiniteConspiracy", function () {
       await expect(
         contract.connect(nonInscribed).submitAnswer(
           mysteryId,
-          answer,
+          who,
+          what,
+          where,
+          why,
           { value: BASE_SUBMISSION_FEE }
         )
       ).to.be.revertedWith("Not inscribed");
@@ -217,7 +250,9 @@ describe("InfiniteConspiracy", function () {
       const cost = await contract.getSubmissionCost(player1.address, mysteryId);
       const bountyPool = (await contract.getMystery(mysteryId)).bountyPool;
       
-      await contract.connect(player1).submitAnswer(mysteryId, answer, { value: cost });
+      await contract.connect(player1).submitAnswer(
+        mysteryId, who, what, where, why, { value: cost }
+      );
       
       const stats = await contract.getPlayerStats(player1.address);
       expect(stats.mysteriesSolved).to.equal(1);
