@@ -10,6 +10,7 @@ from models.conspiracy import ConspiracyMystery
 from .political_context_generator import PoliticalContextGenerator
 from .conspiracy_generator import ConspiracyGenerator
 from .answer_template_generator import AnswerTemplateGenerator
+from .document_name_generator import DocumentNameGenerator
 from .subgraph_generator import SubGraphGenerator
 from .nodes import (
     IdentityNodeGenerator,
@@ -46,6 +47,7 @@ class ConspiracyPipeline:
         self.political_gen = PoliticalContextGenerator(llm_client)
         self.conspiracy_gen = ConspiracyGenerator(llm_client)
         self.answer_template_gen = AnswerTemplateGenerator()
+        self.doc_name_gen = DocumentNameGenerator()
         self.subgraph_gen = SubGraphGenerator()
         
         self.identity_gen = IdentityNodeGenerator()
@@ -179,6 +181,26 @@ class ConspiracyPipeline:
             characters,
             self.config.get("document_generation", {})
         )
+        
+        # PHASE 8b: Generate Neutral Document Names (for on-chain)
+        logger.info("="*60)
+        logger.info("PHASE 8B: GENERATING NEUTRAL DOCUMENT NAMES")
+        logger.info("="*60)
+        doc_name_mapping = self.doc_name_gen.generate_batch(
+            assignments,
+            context={
+                "conspiracy_name": premise.conspiracy_name,
+                "world": political_context.world_name
+            }
+        )
+        # Add neutral names to documents
+        for doc in documents:
+            doc_id = doc.get("document_id")
+            if doc_id in doc_name_mapping:
+                doc["document_name"] = doc_name_mapping[doc_id]
+        
+        logger.info(f"   ✅ Generated {len(doc_name_mapping)} neutral document names")
+        logger.info(f"      Example: {doc['document_id']} → {doc['document_name']}")
         
         # PHASE 9: Red Herring Integration
         logger.info("="*60)
@@ -443,10 +465,11 @@ class ConspiracyPipeline:
         with open(mystery_file, 'w') as f:
             json.dump(mystery.to_dict(), f, indent=2)
         
-        # Save individual documents
+        # Save individual documents (using neutral names for files)
         for doc in mystery.documents:
             doc_id = doc.get("document_id", "unknown")
-            doc_file = docs_dir / f"{doc_id}.json"
+            doc_name = doc.get("document_name", doc_id)  # Use neutral name if available
+            doc_file = docs_dir / doc_name  # Use neutral name for filename
             with open(doc_file, 'w') as f:
                 json.dump(doc, f, indent=2)
         
@@ -520,4 +543,5 @@ class ConspiracyPipeline:
         logger.info(f"   💾 Mystery saved: {folder_name}")
         logger.info(f"      📁 {len(mystery.documents)} documents")
         logger.info(f"      🖼️  {len(mystery.image_clues)} image prompts")
+        logger.info(f"      🔐 Documents use neutral names (e.g., System_Report_2024_11_23_7F3A.txt)")
 
