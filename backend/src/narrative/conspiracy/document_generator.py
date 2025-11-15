@@ -23,7 +23,7 @@ DOCUMENT TYPE: {doc_type}
 AUTHOR/SOURCE: {author}
 TIMESTAMP: {timestamp}
 
-CONSPIRACY CONTEXT (for background only - DO NOT reveal directly):
+CONSPIRACY CONTEXT (for background - keep subtle):
 {conspiracy_summary}
 
 POLITICAL CONTEXT:
@@ -52,26 +52,18 @@ HOW TO INCLUDE EVIDENCE:
 
 CRITICAL CONSTRAINTS:
 1. ✅ INCLUDE ALL evidence listed above (mandatory for validation)
-2. ❌ DO NOT add conclusions or connect the dots
-3. ✅ Make it feel like a real document from this world
-4. ✅ Evidence should feel natural, not forced
-5. ❌ DO NOT reveal the conspiracy directly
-6. ✅ Use appropriate tone/format for {doc_type}
-7. **VERBOSITY REQUIREMENT**: Generate DETAILED content
+2. ✅ Make it feel like a real document from this world
+3. ✅ Evidence should feel natural, not forced
+4. ✅ Use appropriate tone/format for {doc_type}
+5. **VERBOSITY REQUIREMENT**: Generate DETAILED content
    - Technical logs: 8-12 log entries with timestamps, system messages, debug info
    - Emails/memos: 2-4 paragraphs, conversational, detailed context
    - Diaries: personal reflections, detailed thoughts, 2-3 paragraphs
    - The evidence should be HIDDEN in the details, not obvious
-8. **STRUCTURED OUTPUT REQUIREMENT**: 
-   - For logs: Use ARRAYS of structured objects, NOT text dumps
-   - Each log entry should be a separate object with proper fields
-   - For emails/diaries: Use proper structured fields (from, to, subject, body)
-   - DO NOT use a single "content" field with everything as text
-   - Follow the exact JSON schema provided in the format instructions
 
 {doc_type_specific_instructions}
 
-Output ONLY valid JSON with STRUCTURED DATA (arrays of objects, not text dumps):
+OUTPUT FORMAT - USE EXACTLY THESE FIELDS:
 {{
   "document_id": "{doc_id}",
   "document_type": "{doc_type}",
@@ -80,16 +72,18 @@ Output ONLY valid JSON with STRUCTURED DATA (arrays of objects, not text dumps):
   "fields": {{
     {expected_fields}
   }}
-}}"""
+}}
+
+The "fields" object contains the fields shown in {expected_fields} above."""
 
 
 DOC_TYPE_INSTRUCTIONS = {
     "email": """
-EMAIL FORMAT:
+EMAIL FORMAT (NARRATIVE TEXT ONLY):
 - from: sender email
 - to: recipient email(s)
 - subject: email subject
-- body: email body text (3-5 paragraphs minimum)
+- body: email body text (3-5 paragraphs minimum) - pure narrative prose
 - timestamp: when sent
 
 Professional but natural tone. Include:
@@ -98,12 +92,15 @@ Professional but natural tone. Include:
 - Personal observations or concerns
 - References to previous conversations
 - Evidence hidden naturally in the narrative
+
+This is an email message. Use only the five fields listed above.
+Write the entire email as flowing narrative text in the "body" field.
 """,
     "diary": """
-DIARY FORMAT:
+DIARY FORMAT (NARRATIVE TEXT ONLY):
 - date: diary entry date
 - author: who wrote it
-- content: diary entry text (3-5 paragraphs minimum)
+- content: diary entry text (3-5 paragraphs minimum) - pure narrative prose
 - mood: optional mood indicator
 
 Personal, introspective tone. Include:
@@ -112,21 +109,27 @@ Personal, introspective tone. Include:
 - Paranoia, stress, internal conflict
 - Evidence embedded in personal reflections
 - At least 3-4 substantial paragraphs
+
+This is a personal diary. Use only the four fields listed above.
+Write the entire entry as flowing narrative text in the "content" field.
 """,
     "internal_memo": """
-MEMO FORMAT:
+MEMO FORMAT (NARRATIVE TEXT ONLY):
 - from: sender
 - to: recipients
 - subject: memo subject
 - date: when issued
-- content: memo text (multiple paragraphs)
+- content: memo text (multiple paragraphs) - pure narrative prose
 
 Official, bureaucratic tone. Include:
 - Formal opening
-- Multiple sections or bullet points
+- Multiple sections or bullet points written as text
 - Policy details, procedures, or announcements
 - References to departments or protocols
 - Evidence hidden in bureaucratic language
+
+This is an internal memo. Use only the five fields listed above.
+Write the entire memo as flowing narrative text in the "content" field.
 """,
     "badge_log": """
 BADGE LOG FORMAT:
@@ -574,7 +577,7 @@ class ConstrainedDocumentGenerator:
         conspiracy_summary = f"""
 Conspiracy Name: {premise.conspiracy_name}
 Type: {premise.conspiracy_type}
-(Keep this in background - don't reveal directly)
+(Keep this subtle and in background)
 """
         
         political_summary = f"""
@@ -608,9 +611,9 @@ Setting: {political_context.time_period}
         field_templates = {
             "email": '"from": "...", "to": "...", "subject": "...", "body": "..."',
             
-            "diary": '"date": "...", "author": "...", "content": "...", "mood": "...", "entries": [{"time": "...", "text": "..."}]',
+            "diary": '"date": "...", "author": "...", "content": "...", "mood": "..."',
             
-            "internal_memo": '"from": "...", "to": "...", "subject": "...", "date": "...", "content": "...", "sections": [{"heading": "...", "text": "..."}]',
+            "internal_memo": '"from": "...", "to": "...", "subject": "...", "date": "...", "content": "..."',
             
             "badge_log": '"facility": "...", "log_date": "...", "system_version": "...", "entries": [{"timestamp": "...", "badge_id": "...", "user": "...", "location": "...", "event": "...", "status": "..."}]',
             
@@ -640,7 +643,20 @@ Setting: {political_context.time_period}
             
             "asset_database": '"database": "...", "query_date": "...", "records": [{"asset_id": "...", "asset_type": "...", "owner": "...", "location": "...", "value": "...", "status": "...", "acquisition_date": "...", "notes": "..."}]',
             
-            "phone_record": '"record_date": "...", "calls": [{"timestamp": "...", "caller": "...", "recipient": "...", "duration": "...", "call_type": "...", "notes": "..."}]'
+            "phone_record": '"record_date": "...", "calls": [{"timestamp": "...", "caller": "...", "recipient": "...", "duration": "...", "call_type": "...", "notes": "..."}]',
+            
+            # Narrative document types - NO technical arrays
+            "security_report": '"report_id": "...", "date": "...", "author": "...", "subject": "...", "content": "...", "severity": "..."',
+            
+            "incident_report": '"report_id": "...", "date": "...", "reporter": "...", "incident_type": "...", "description": "...", "impact": "..."',
+            
+            "it_ticket": '"ticket_id": "...", "date": "...", "requester": "...", "subject": "...", "description": "...", "resolution": "..."',
+            
+            "hr_memo": '"from": "...", "to": "...", "subject": "...", "date": "...", "content": "..."',
+            
+            "personnel_file": '"employee_name": "...", "employee_id": "...", "department": "...", "date": "...", "notes": "..."',
+            
+            "audit_report": '"audit_id": "...", "date": "...", "auditor": "...", "scope": "...", "findings": "...", "recommendations": "..."'
         }
         
         return field_templates.get(doc_type, '"content": "..."')

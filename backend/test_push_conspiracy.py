@@ -21,12 +21,18 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 
-async def generate_and_push():
-    """Generate conspiracy and push documents to Arkiv."""
+async def generate_and_push(environment: str = "dev"):
+    """
+    Generate conspiracy and push documents to Arkiv.
+    
+    Args:
+        environment: "dev" or "prod" (for filtering in presentations)
+    """
     
     logger.info("="*60)
     logger.info("GENERATE CONSPIRACY + PUSH DOCUMENTS")
     logger.info("="*60)
+    logger.info(f"Environment: {environment.upper()}")
     logger.info("")
     
     # Check keys
@@ -108,7 +114,8 @@ async def generate_and_push():
                     "mystery_id": mystery.mystery_id,
                     "world": mystery.political_context.world_name,
                     "difficulty": str(mystery.difficulty),
-                    "conspiracy_type": "occult",
+                    "conspiracy_type": mystery.premise.conspiracy_type,  # From mystery data!
+                    "environment": environment,  # dev or prod
                     "status": "active"
                 },
                 "expires_in": 604800  # 7 days
@@ -131,7 +138,8 @@ async def generate_and_push():
                         "mystery_id": mystery.mystery_id,
                         "document_id": doc.get("document_id"),
                         "doc_type": doc.get("document_type"),  # Filterable by type!
-                        "world": mystery.political_context.world_name
+                        "world": mystery.political_context.world_name,
+                        "environment": environment  # dev or prod
                     },
                     "expires_in": 604800
                 })
@@ -162,5 +170,17 @@ async def generate_and_push():
 
 
 if __name__ == "__main__":
-    asyncio.run(generate_and_push())
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate and push conspiracy to Arkiv')
+    parser.add_argument(
+        '--env',
+        choices=['dev', 'prod'],
+        default='dev',
+        help='Environment tag (dev or prod) for filtering'
+    )
+    
+    args = parser.parse_args()
+    
+    asyncio.run(generate_and_push(environment=args.env))
 
