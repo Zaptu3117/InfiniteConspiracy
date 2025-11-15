@@ -44,7 +44,8 @@ HOW TO INCLUDE EVIDENCE:
 - For IPs/IDs/numbers: Use the EXACT values shown above
 - For names/identifiers: Include them VERBATIM
 - For timestamps: Use the exact times or reference them
-- For crypto key hints: Include the COMPLETE phrase
+- For crypto key hints: Include the EXACT phrase naturally in character backstory
+  (e.g., if key is "silver tide", write: "mother sang about the silver tide")
 - Weave them naturally into the document content
 
 ═══════════════════════════════════════════════════════════════
@@ -306,6 +307,7 @@ class ConstrainedDocumentGenerator:
         """
         self.llm = llm_client
         self.encryptor = PhraseEncryptor()
+        self.subgraph_timestamps = {}  # Cache timestamps per subgraph for coherence
     
     async def generate_documents(
         self,
@@ -406,17 +408,26 @@ class ConstrainedDocumentGenerator:
             logger.error(f"   ❌ CRITICAL: No evidence nodes for {assignment.document_id}")
             raise Exception(f"No evidence nodes assigned to document {assignment.document_id} - cannot generate")
         
-        # Build evidence list with EXTRACTED KEY VALUES
-        evidence_list = self._format_evidence_for_prompt(evidence_nodes, assignment.document_type)
+        # Build evidence list with EXTRACTED KEY VALUES + LINKING CONTEXT
+        evidence_list = self._format_evidence_for_prompt(
+            evidence_nodes, 
+            assignment.document_type,
+            assignment.subgraph_ids,
+            node_lookup
+        )
         
         # Get author (character or system)
         author = self._select_author(assignment.document_type, characters)
+        
+        # Generate timestamp with subgraph coherence
+        timestamp = self._generate_timestamp(assignment.subgraph_ids)
         
         # Build prompt
         prompt = self._build_document_prompt(
             assignment,
             evidence_list,
             author,
+            timestamp,
             premise,
             political_context
         )
@@ -475,27 +486,51 @@ class ConstrainedDocumentGenerator:
                     logger.error(f"      This document is REQUIRED for mystery integrity!")
                     raise Exception(f"Failed to generate required document {assignment.document_id}: {e}")
     
-    def _format_evidence_for_prompt(self, evidence_nodes: List[EvidenceNode], doc_type: str = "document") -> str:
-        """Extract and format key values from evidence for prompt."""
+    def _format_evidence_for_prompt(
+        self, 
+        evidence_nodes: List[EvidenceNode], 
+        doc_type: str = "document",
+        subgraph_ids: List[str] = None,
+        node_lookup: Dict[str, EvidenceNode] = None
+    ) -> str:
+        """
+        Extract and format key values from evidence for prompt.
+        
+        CRITICAL: For identity chains, include LINKING IDENTIFIERS so documents
+        can be cross-referenced. Each document should contain at least 2 identifiers.
+        """
         import re
         
         formatted_lines = []
+        
+        # For identity chains, get the "name" identifier as common linking field
+        common_name = None
+        if subgraph_ids and node_lookup:
+            for node_id, node in node_lookup.items():
+                if (node.subgraph_id in subgraph_ids and 
+                    node.evidence_type.value == "identity" and
+                    hasattr(node, 'identifier_type') and 
+                    node.identifier_type == "name"):
+                    common_name = node.identifier_value
+                    break
         
         for i, node in enumerate(evidence_nodes, 1):
             # Extract key values based on evidence type
             key_values = []
             
             if node.evidence_type.value == "identity":
-                # Extract IPs, IDs, numbers, MAC addresses, session IDs
+                # Use the actual identifier from the node
+                if hasattr(node, 'identifier_type') and hasattr(node, 'identifier_value'):
+                    key_values.append(f"{node.identifier_type}: {node.identifier_value}")
+                
+                # Also extract from content as fallback
                 ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', node.content)
                 macs = re.findall(r'\b([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b', node.content)
                 ids = re.findall(r'(?:VPN_|AST|WS-|#)([A-Z0-9]{4,})', node.content)
-                employees = re.findall(r'(?:Employee|Personnel|Director)\s+#?(\d+)', node.content)
                 
                 key_values.extend(ips)
                 key_values.extend(macs)
                 key_values.extend(ids)
-                key_values.extend(employees)
             
             elif node.evidence_type.value == "cryptographic":
                 # Extract crypto key hint phrases
@@ -513,9 +548,15 @@ class ConstrainedDocumentGenerator:
                 formatted_lines.append(f"\n⚠️  MANDATORY - Include these EXACT values:")
                 for val in key_values:
                     formatted_lines.append(f"   → {val}")
-                formatted_lines.append(f"\nWeave them naturally into {doc_type} content.")
-            else:
-                formatted_lines.append(f"\n⚠️  Include the above evidence naturally in the document")
+        
+        # Add common name as linking identifier for identity documents
+        if common_name and any(n.evidence_type.value == "identity" for n in evidence_nodes):
+            formatted_lines.append(f"\n{'='*60}")
+            formatted_lines.append(f"🔗 LINKING IDENTIFIER:")
+            formatted_lines.append(f"{'='*60}")
+            formatted_lines.append(f"\n⚠️  MANDATORY: Also include this identifier for cross-referencing:")
+            formatted_lines.append(f"   → name: {common_name}")
+            formatted_lines.append(f"\nThis allows linking with other documents in this chain.")
         
         return "\n".join(formatted_lines)
     
@@ -524,6 +565,7 @@ class ConstrainedDocumentGenerator:
         assignment: DocumentAssignment,
         evidence_list: str,
         author: str,
+        timestamp: str,
         premise: ConspiracyPremise,
         political_context: PoliticalContext
     ) -> str:
@@ -550,7 +592,7 @@ Setting: {political_context.time_period}
         prompt = DOCUMENT_GENERATION_PROMPT.format(
             doc_type=doc_type,
             author=author,
-            timestamp=self._generate_timestamp(),
+            timestamp=timestamp,
             conspiracy_summary=conspiracy_summary,
             political_summary=political_summary,
             evidence_list=evidence_list,
@@ -618,12 +660,31 @@ Setting: {political_context.time_period}
         
         return "Author"
     
-    def _generate_timestamp(self) -> str:
-        """Generate a timestamp for document."""
+    def _generate_timestamp(self, subgraph_ids: List[str] = None) -> str:
+        """
+        Generate a timestamp for document.
+        
+        For documents in the same subgraph, use consistent base date/time
+        to ensure temporal coherence.
+        """
         import random
         from datetime import datetime, timedelta
         
-        # Random time in the last 30 days
+        # If subgraph provided, check for cached timestamp
+        if subgraph_ids and len(subgraph_ids) > 0:
+            primary_subgraph = subgraph_ids[0]
+            if primary_subgraph in self.subgraph_timestamps:
+                # Use cached base time with small variation (±2 hours)
+                base = self.subgraph_timestamps[primary_subgraph]
+                variation = timedelta(minutes=random.randint(-120, 120))
+                return (base + variation).isoformat()
+            else:
+                # Create new base time for this subgraph
+                base = datetime.now() - timedelta(days=random.randint(1, 30))
+                self.subgraph_timestamps[primary_subgraph] = base
+                return base.isoformat()
+        
+        # No subgraph - random time
         base = datetime.now() - timedelta(days=random.randint(1, 30))
         return base.isoformat()
     
@@ -721,21 +782,45 @@ Setting: {political_context.time_period}
             
             # TYPE 1: CRYPTOGRAPHIC - Strictest validation
             if node.evidence_type.value == "cryptographic":
-                # For crypto key hints, check the EXACT inference phrase is present
+                # For crypto key hints, check the EXACT key phrase is present
                 if "Character backstory reveals:" in node.content:
                     # Extract the key phrase (after the colon)
                     key_phrase = node.content.split("Character backstory reveals:")[-1].strip()
-                    # Normalize the key phrase
-                    key_phrase_normalized = self._normalize_text(key_phrase)
-                    # MUST have 100% - players need the full phrase to decrypt!
-                    key_words = [w for w in key_phrase_normalized.lower().split() if len(w) > 3]
-                    if key_words:
-                        # Require ALL key words to be present (100%)
-                        matches = sum(1 for word in key_words if word in doc_str_lower)
-                        present = matches == len(key_words)
-                    else:
-                        # If no key words, check exact phrase
-                        present = key_phrase_normalized.lower() in doc_str_lower
+                    
+                    # Normalize BOTH the phrase and document for comparison
+                    key_phrase_normalized = self._normalize_text(key_phrase).lower()
+                    doc_normalized = self._normalize_text(doc_str).lower()
+                    
+                    # DEBUG: Log what we're looking for
+                    logger.debug(f"🔍 Crypto validation:")
+                    logger.debug(f"   Looking for: {key_phrase_normalized[:80]}")
+                    logger.debug(f"   In document: {doc_normalized[:200]}")
+                    
+                    # The EXACT phrase MUST be present for cipher to work
+                    present = key_phrase_normalized in doc_normalized
+                    
+                    if not present:
+                        # More aggressive cleaning - remove ALL quotes and normalize whitespace
+                        import re
+                        # Remove all types of quotes
+                        key_clean = key_phrase_normalized
+                        for quote in ['"', '"', '"', "'", ''', ''']:
+                            key_clean = key_clean.replace(quote, '')
+                        key_clean = re.sub(r'\s+', ' ', key_clean).strip()
+                        
+                        doc_clean = doc_normalized
+                        for quote in ['"', '"', '"', "'", ''', ''']:
+                            doc_clean = doc_clean.replace(quote, '')
+                        doc_clean = re.sub(r'\s+', ' ', doc_clean)
+                        
+                        present = key_clean in doc_clean
+                        
+                        if present:
+                            logger.debug(f"   ✅ Found after cleaning quotes")
+                        else:
+                            logger.debug(f"   ❌ NOT FOUND even after cleaning")
+                            logger.debug(f"   Key (clean): {key_clean[:100]}")
+                            logger.debug(f"   Doc (clean): {doc_clean[:300]}")
                 
                 # For encrypted phrases, just check they exist (will be encrypted)
                 elif node.encrypted_phrase:

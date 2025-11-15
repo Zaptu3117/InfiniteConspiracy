@@ -1,8 +1,8 @@
-"""Anti-automation validation system."""
+"""Validation system for conspiracy mysteries."""
 
-from .anti_automation import AntiAutomationValidator
+from .conspiracy_validator import ConspiracyValidator
 
 __all__ = [
-    'AntiAutomationValidator'
+    'ConspiracyValidator'
 ]
 

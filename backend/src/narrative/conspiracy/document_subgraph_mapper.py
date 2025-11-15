@@ -123,6 +123,10 @@ class DocumentSubGraphMapper:
         logger.info(f"      Psychological docs: {len(psychological_docs)}")
         logger.info(f"      Crypto docs: {len(crypto_docs)}")
         logger.info(f"      Connection docs: {len(connection_docs)}")
+        
+        # CRITICAL: Populate required_document_ids for inference nodes
+        logger.info("   🔗 Linking inference nodes to documents...")
+        self._populate_inference_document_ids(subgraphs, assignments)
         logger.info("")
         
         return assignments
@@ -341,4 +345,50 @@ class DocumentSubGraphMapper:
             assigned_nodes.add(node.node_id)
         
         return assignments
+    
+    def _populate_inference_document_ids(
+        self,
+        subgraphs: List[SubGraph],
+        assignments: List[DocumentAssignment]
+    ):
+        """
+        Populate required_document_ids for all inference nodes.
+        
+        Each inference node needs to know which documents contain
+        the evidence it depends on.
+        """
+        # Build map: evidence_node_id -> document_id
+        evidence_to_doc = {}
+        for assignment in assignments:
+            for evidence_node_id in assignment.evidence_node_ids:
+                evidence_to_doc[evidence_node_id] = assignment.document_id
+        
+        logger.info(f"      Evidence nodes mapped to {len(set(evidence_to_doc.values()))} documents")
+        
+        # For each inference node, find required documents
+        updated_count = 0
+        for sg in subgraphs:
+            for inference_node in sg.inference_nodes:
+                required_docs = set()
+                
+                # Get documents containing parent evidence nodes
+                for parent_id in inference_node.parent_node_ids:
+                    if parent_id in evidence_to_doc:
+                        required_docs.add(evidence_to_doc[parent_id])
+                
+                # If no parents found, try to find evidence from same subgraph
+                if not required_docs:
+                    for evidence_node in sg.evidence_nodes:
+                        if evidence_node.node_id in evidence_to_doc:
+                            required_docs.add(evidence_to_doc[evidence_node.node_id])
+                            # Just add first 1-2 documents from this subgraph
+                            if len(required_docs) >= 2:
+                                break
+                
+                # Update the inference node
+                if required_docs:
+                    inference_node.required_document_ids = list(required_docs)
+                    updated_count += 1
+        
+        logger.info(f"      ✅ Updated {updated_count} inference nodes with document IDs")
 

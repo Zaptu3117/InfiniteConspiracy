@@ -49,7 +49,28 @@ class CerebrasClient:
                     max_tokens=max_tokens,
                     **kwargs
                 )
-                return response.choices[0].message.content
+                
+                # Debug logging for empty responses
+                if not response.choices:
+                    logger.warning(f"   ⚠️  API returned no choices!")
+                    logger.warning(f"   Response: {response}")
+                    return ""
+                
+                message = response.choices[0].message
+                content = message.content
+                
+                # Some models use 'reasoning' field for chain-of-thought
+                if not content and hasattr(message, 'reasoning') and message.reasoning:
+                    logger.debug(f"   Using reasoning field: {message.reasoning[:100]}...")
+                    content = message.reasoning
+                
+                if not content:
+                    logger.warning(f"   ⚠️  API returned empty content!")
+                    logger.warning(f"   Message: {message}")
+                    logger.warning(f"   Finish reason: {response.choices[0].finish_reason}")
+                    return ""
+                
+                return content
             except Exception as e:
                 error_str = str(e)
                 # Check if it's a rate limit error (429)
@@ -59,7 +80,13 @@ class CerebrasClient:
                         logger.warning(f"   ⚠️  Rate limit hit, retrying in {wait_time:.1f}s (attempt {attempt + 1}/{max_retries})...")
                         await asyncio.sleep(wait_time)
                         continue
+                    else:
+                        # Last retry failed with rate limit
+                        raise Exception(f"Cerebras API rate limit exceeded after {max_retries} attempts")
                 raise Exception(f"Cerebras API error: {error_str}")
+        
+        # Should never reach here, but just in case
+        raise Exception("All API attempts failed")
     
     async def generate_json(
         self,

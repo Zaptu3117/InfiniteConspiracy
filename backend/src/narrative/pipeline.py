@@ -12,7 +12,7 @@ from .crypto_integrator import CryptoIntegrator
 from .red_herrings import RedHerringGenerator
 from images import ImageGenerator, VLMValidator
 from utils import OpenAIClient
-from validation.anti_automation import AntiAutomationValidator
+# Legacy validator removed - use ConspiracyValidator for conspiracy mysteries
 
 
 logger = logging.getLogger(__name__)
@@ -412,23 +412,21 @@ class LLMNarrativePipeline:
         return proof_tree
     
     async def _validate_mystery(self, mystery: Mystery):
-        """Validate that mystery requires multi-hop reasoning."""
-        validator = AntiAutomationValidator(self.llm)
+        """
+        LEGACY: Validate that mystery requires multi-hop reasoning.
         
-        logger.info("Test 1: Single-LLM attempt (should FAIL)...")
-        logger.info("   Giving LLM all documents at once...")
+        Note: This pipeline is for legacy mysteries. For conspiracy mysteries,
+        use ConspiracyValidator from validation.conspiracy_validator.
+        """
+        logger.warning("⚠️  Legacy validation not available - AntiAutomationValidator removed")
+        logger.warning("   For conspiracy mysteries, use ConspiracyValidator")
         
-        # Run validation
-        result = await validator.validate_mystery(mystery)
-        
-        # Log results
-        logger.info("")
-        logger.info("📊 Validation Summary:")
-        logger.info(f"   Single-LLM found answer: {result.single_llm_got_answer}")
-        logger.info(f"   Single-LLM response: {result.single_llm_response}")
-        logger.info(f"   Multi-hop reached answer: {result.multi_hop_reached_answer}")
-        logger.info(f"   Multi-hop steps passed: {sum(1 for s in result.multi_hop_steps if s.matches)}/{len(result.multi_hop_steps)}")
-        logger.info("")
-        
+        # Return mock result
+        from models.validation_result import ValidationResult
+        result = ValidationResult(
+            mystery_id=mystery.metadata.mystery_id,
+            is_valid=False,
+            reason="Legacy validator removed - use ConspiracyValidator for conspiracy mysteries"
+        )
         return result
 

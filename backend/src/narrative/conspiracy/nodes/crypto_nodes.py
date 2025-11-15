@@ -27,32 +27,37 @@ CHARACTERS (who might have keys):
 YOUR TASK:
 Generate {num_keys} cryptographic keys that require INFERENCE from character backstories.
 
-EXAMPLES OF INFERENCE-BASED KEYS:
-- "what father always said about trust" → Character backstory reveals: "Never trust the system"
-- "the promise we made that night" → Timeline shows shared oath: "We swore to protect the truth"
-- "the night everything changed" → Past event description: "The Blackwater Incident of 2019"
-- "mother's final warning" → Character history: "Beware the ones who smile brightest"
-- "the place where it all began" → Location reference: "The Obsidian Chamber beneath headquarters"
+⚠️ CRITICAL: Keys must be SHORT (2-4 words max) - they are PASSWORDS!
 
-IMPORTANT:
-- Keys should be OBSCURE references, not obvious
-- Require understanding character history/relationships
-- Not simple facts like pet names or birthdays
-- Should feel meaningful to the character
-- Discoverable but require reading and inference
+EXAMPLES OF GOOD INFERENCE-BASED KEYS:
+- "mother's lullaby phrase" → Character backstory: "mother sang about silver tide" → Key: "silver tide"
+- "father's warning" → Character history: "father said never trust" → Key: "never trust"  
+- "the oath we swore" → Shared memory: "we promised to protect truth" → Key: "protect truth"
+- "childhood memory" → Diary entry: "hiding beneath broken compass" → Key: "broken compass"
+- "the night everything changed" → Timeline: "eclipse over obsidian chamber" → Key: "eclipse obsidian"
+
+IMPORTANT RULES:
+✅ Keys MUST be 2-4 words maximum (e.g., "SILVER TIDE", "NEVER TRUST")
+✅ Keys should be MEMORABLE phrases, not random words
+✅ Require reading MULTIPLE documents to piece together
+✅ Obscure but discoverable through character backstory
+✅ Should feel meaningful to the character
+❌ NO full sentences (e.g., "the object that held the abyss's heart")
+❌ NO more than 4 words
+❌ NOT obvious facts like pet names or birthdays
 
 For each key, provide:
-1. inference_description: The obscure reference (e.g., "what father taught me about loyalty")
-2. actual_key: The text that becomes the cipher key (e.g., "FAMILY FIRST")
-3. hint_text: How it's hinted in documents (e.g., "Remember what he always said...")
+1. inference_description: The obscure reference (e.g., "mother's lullaby")
+2. actual_key: SHORT password 2-4 words (e.g., "silver tide")
+3. hint_text: How encrypted doc hints at it (e.g., "Use the phrase from the lullaby")
 4. character_name: Which character's backstory contains this
-5. discovery_method: How to discover it (e.g., "Read character's diary entry about father")
+5. discovery_method: How to find it (e.g., "Read character's diary + family letter")
 
 Output JSON array with {num_keys} key objects:
 [
   {{
     "inference_description": "Obscure reference requiring inference",
-    "actual_key": "THE ACTUAL KEY TEXT",
+    "actual_key": "short memorable phrase",
     "hint_text": "How it's hinted in encrypted document",
     "character_name": "Character Name",
     "discovery_method": "How to find the key"
@@ -321,15 +326,22 @@ Conspiracy: {premise.conspiracy_name}
         subgraph_id: str,
         crypto_keys: List[CryptoKey]
     ) -> List[EvidenceNode]:
-        """Generate evidence nodes that hint at keys."""
+        """
+        Generate evidence nodes that contain the actual key phrases.
+        
+        The document should naturally mention the key phrase so players
+        can discover it through character backstory inference.
+        """
         hint_nodes = []
         
         for i, key in enumerate(crypto_keys):
-            # Create character backstory hint
+            # Create character backstory hint with ACTUAL key phrase
+            # Format: "Character backstory reveals: [actual key phrase]"
+            # This tells the LLM to naturally weave the key phrase into the character's story
             hint_node = EvidenceNode(
                 node_id=f"{subgraph_id}_key_hint_{i}",
                 evidence_type=EvidenceType.CRYPTOGRAPHIC,
-                content=f"Character backstory reveals: {key.inference_description}",
+                content=f"Character backstory reveals: {key.key_value}",
                 assigned_doc_type=random.choice(["diary", "witness_statement", "internal_memo"]),
                 isolated=True,
                 importance="key",

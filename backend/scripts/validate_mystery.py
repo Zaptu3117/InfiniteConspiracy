@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Validate that a mystery requires multi-hop reasoning.
+LEGACY: Validate that a mystery requires multi-hop reasoning.
+
+⚠️  This script is for LEGACY mysteries only (non-conspiracy system).
+⚠️  For conspiracy mysteries, use: test_multi_hop_validation.py
 
 Usage:
     python scripts/validate_mystery.py <mystery_id>
@@ -17,11 +20,30 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from utils import load_config, setup_logger, CerebrasClient
 from models import Mystery
-from validation.anti_automation import AntiAutomationValidator
+
+# LEGACY: AntiAutomationValidator was removed
+# Use ConspiracyValidator for conspiracy mysteries
 
 
 async def validate_mystery(mystery_id: str):
-    """Validate a mystery."""
+    """LEGACY: Validate a mystery."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.error("="*60)
+    logger.error("⚠️  LEGACY VALIDATOR REMOVED")
+    logger.error("="*60)
+    logger.error("AntiAutomationValidator has been removed.")
+    logger.error("")
+    logger.error("For conspiracy mysteries, use:")
+    logger.error("  python test_multi_hop_validation.py")
+    logger.error("")
+    logger.error("This script is kept for reference only.")
+    logger.error("="*60)
+    return False
+    
+    # Original code commented out below:
+    """
     logger = setup_logger("mystery_validator", "INFO", config.log_dir)
     
     # Load mystery
