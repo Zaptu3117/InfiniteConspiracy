@@ -60,8 +60,8 @@ async def test_full_conspiracy_generation():
         },
         "document_generation": {
             "temperature": 0.7,
-            "max_tokens": 2000,
-            "parallel_batch_size": 3  # Very small batches to avoid rate limits
+            "max_tokens": 4000,  # Increased for verbose structured documents
+            "parallel_batch_size": 5  # Increased for better performance
         },
         "character_enhancement": {
             "temperature": 0.7,

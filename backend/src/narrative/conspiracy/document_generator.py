@@ -30,7 +30,7 @@ POLITICAL CONTEXT:
 {political_summary}
 
 YOUR TASK:
-Generate a realistic {doc_type} that contains the following evidence fragments:
+Generate a realistic, VERBOSE {doc_type} that contains the following evidence fragments:
 
 EVIDENCE TO INCLUDE:
 {evidence_list}
@@ -42,10 +42,21 @@ CRITICAL CONSTRAINTS:
 4. Evidence should feel natural, not forced
 5. DO NOT reveal the conspiracy directly
 6. Use appropriate tone/format for {doc_type}
+7. **VERBOSITY REQUIREMENT**: Generate DETAILED content
+   - Technical logs: 8-12 log entries with timestamps, system messages, debug info
+   - Emails/memos: 2-4 paragraphs, conversational, detailed context
+   - Diaries: personal reflections, detailed thoughts, 2-3 paragraphs
+   - The evidence should be HIDDEN in the details, not obvious
+8. **STRUCTURED OUTPUT REQUIREMENT**: 
+   - For logs: Use ARRAYS of structured objects, NOT text dumps
+   - Each log entry should be a separate object with proper fields
+   - For emails/diaries: Use proper structured fields (from, to, subject, body)
+   - DO NOT use a single "content" field with everything as text
+   - Follow the exact JSON schema provided in the format instructions
 
 {doc_type_specific_instructions}
 
-Output ONLY valid JSON:
+Output ONLY valid JSON with STRUCTURED DATA (arrays of objects, not text dumps):
 {{
   "document_id": "{doc_id}",
   "document_type": "{doc_type}",
@@ -63,19 +74,29 @@ EMAIL FORMAT:
 - from: sender email
 - to: recipient email(s)
 - subject: email subject
-- body: email body text
+- body: email body text (3-5 paragraphs minimum)
 - timestamp: when sent
 
-Keep email tone professional but natural.
+Professional but natural tone. Include:
+- Greeting and context
+- Multiple paragraphs with details
+- Personal observations or concerns
+- References to previous conversations
+- Evidence hidden naturally in the narrative
 """,
     "diary": """
 DIARY FORMAT:
 - date: diary entry date
 - author: who wrote it
-- content: diary entry text
+- content: diary entry text (3-5 paragraphs minimum)
 - mood: optional mood indicator
 
-Personal, introspective tone. Can show stress, paranoia, thoughts.
+Personal, introspective tone. Include:
+- Stream of consciousness thoughts
+- Detailed descriptions of events and feelings
+- Paranoia, stress, internal conflict
+- Evidence embedded in personal reflections
+- At least 3-4 substantial paragraphs
 """,
     "internal_memo": """
 MEMO FORMAT:
@@ -83,32 +104,44 @@ MEMO FORMAT:
 - to: recipients
 - subject: memo subject
 - date: when issued
-- content: memo text
+- content: memo text (multiple paragraphs)
 
-Official, bureaucratic tone. Company/agency policy or announcements.
+Official, bureaucratic tone. Include:
+- Formal opening
+- Multiple sections or bullet points
+- Policy details, procedures, or announcements
+- References to departments or protocols
+- Evidence hidden in bureaucratic language
 """,
     "badge_log": """
 BADGE LOG FORMAT:
 - facility: location name
 - log_date: date of log
-- entries: array of access entries
-  - badge_number: badge ID
-  - name: person name (if available)
-  - entry_time: when scanned
-  - location: which door/area
-  - notes: optional notes
+- entries: verbose log entries (minimum 10-15 entries)
 
-Technical, automated system output.
+Generate detailed access log with:
+- Timestamps with milliseconds
+- Badge scans, door access events
+- System messages and status updates
+- Occasional warnings or anomalies
+- Evidence entries mixed with normal traffic
+- Include system boot messages, periodic checks, etc.
+Technical, automated system output with lots of detail.
 """,
     "witness_statement": """
 WITNESS STATEMENT FORMAT:
 - witness_name: who gave statement
 - statement_date: when given
 - interviewer: who took statement
-- statement: the actual testimony text
+- statement: detailed testimony (3-5 paragraphs minimum)
 - location: where statement was taken
 
-First-person account, conversational but recorded officially.
+First-person account with:
+- Detailed description of events
+- Personal observations and impressions
+- Timeline of what they saw/heard
+- Conversational but thorough
+- Evidence embedded in their story
 """,
     "police_report": """
 POLICE REPORT FORMAT:
@@ -117,11 +150,132 @@ POLICE REPORT FORMAT:
 - officer_name: reporting officer
 - incident_date: when incident occurred
 - incident_location: where it happened
-- report: description of incident
+- report: detailed incident description (multiple paragraphs)
 - evidence_noted: list of evidence items
 - status: case status
 
-Official, factual, police/investigative tone.
+Official, factual tone with:
+- Thorough chronological description
+- Multiple witnesses or observations
+- Detailed evidence list
+- Officer's professional assessment
+- At least 3-4 paragraphs of narrative
+""",
+    "login_history": """
+LOGIN HISTORY FORMAT (STRUCTURED JSON):
+- system: authentication system name and version
+- log_period_start: start of log period (ISO timestamp)
+- log_period_end: end of log period (ISO timestamp)
+- authentication_events: ARRAY of 8-12 structured login events
+
+Each authentication_event object must have:
+- timestamp: exact login time (ISO format with milliseconds)
+- user_id: unique user identifier
+- username: human-readable username
+- ip_address: source IP
+- device: device identifier or name
+- event: LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT, TIMEOUT, etc.
+- status: SUCCESS or FAILED
+- notes: optional debug/system messages
+
+Generate 8-12 diverse authentication events with evidence hidden among normal activity.
+Include system messages, security warnings, and occasional anomalies.
+""",
+    "server_log": """
+SERVER LOG FORMAT (STRUCTURED JSON):
+- server_name: server identifier
+- log_date: date of log
+- log_level: overall log level (INFO, DEBUG, WARNING)
+- entries: ARRAY of 8-12 structured log entries
+
+Each entry object must have:
+- timestamp: exact time (ISO format with milliseconds)
+- level: INFO, DEBUG, WARNING, ERROR, CRITICAL
+- service: service/process name
+- message: log message
+- details: additional context (optional)
+
+Generate diverse server events: service starts/stops, API calls, health checks, errors.
+Evidence should be hidden among normal system activity.
+""",
+    "firewall_log": """
+FIREWALL LOG FORMAT (STRUCTURED JSON):
+- firewall_id: firewall device identifier
+- log_date: date of log
+- entries: ARRAY of 8-12 structured firewall events
+
+Each entry object must have:
+- timestamp: exact time (ISO format with milliseconds)
+- source_ip: source IP address
+- dest_ip: destination IP address
+- source_port: source port number
+- dest_port: destination port number
+- protocol: TCP, UDP, ICMP, HTTPS, etc.
+- action: ALLOW, BLOCK, DROP
+- rule: firewall rule ID that triggered
+- bytes: bytes transferred (optional)
+
+Generate diverse network traffic with evidence connections hidden among normal traffic.
+Include allowed and blocked connections, security warnings.
+""",
+    "network_log": """
+NETWORK LOG FORMAT (STRUCTURED JSON):
+- network_segment: network segment identifier
+- log_date: date of log
+- entries: ARRAY of 8-12 structured network events
+
+Each entry object must have:
+- timestamp: exact time (ISO format with milliseconds)
+- source: source device/IP
+- destination: destination device/IP
+- protocol: HTTP, HTTPS, SSH, FTP, etc.
+- bytes_sent: data sent
+- bytes_received: data received
+- status: ESTABLISHED, CLOSED, TIMEOUT, etc.
+- connection_id: unique connection identifier
+
+Generate diverse network activity with evidence traffic hidden in normal operations.
+""",
+    "access_control": """
+ACCESS CONTROL LOG FORMAT (STRUCTURED JSON):
+- facility: facility name
+- log_date: date of log
+- system_version: access control system version
+- entries: ARRAY of 8-12 structured access events
+- system_events: ARRAY of 3-5 system status messages
+
+Each access entry object must have:
+- timestamp: exact time (ISO format with milliseconds)
+- event_type: ACCESS_GRANTED, ACCESS_DENIED, BADGE_SCAN, etc.
+- badge_id: badge identifier (hex or alphanumeric)
+- user: username or user ID
+- clearance_level: numeric clearance level
+- zone: security zone
+- door: door identifier
+- result: GRANTED, DENIED, ERROR
+- notes: optional additional information
+
+Generate diverse access events with evidence access hidden among routine badge scans.
+Include system messages, security alerts, firmware updates.
+""",
+    "vpn_log": """
+VPN LOG FORMAT (STRUCTURED JSON):
+- vpn_gateway: VPN gateway identifier
+- log_date: date of log
+- entries: ARRAY of 8-12 structured VPN connection events
+
+Each entry object must have:
+- timestamp: exact time (ISO format with milliseconds)
+- user_id: VPN user identifier
+- client_ip: client IP address
+- server_ip: VPN server IP
+- event: CONNECT, DISCONNECT, AUTH_SUCCESS, AUTH_FAILED
+- protocol: OpenVPN, IPSec, WireGuard, etc.
+- encryption: encryption method used
+- bytes_transferred: data transferred (optional)
+- duration: connection duration (optional)
+
+Generate diverse VPN events with evidence connections hidden in routine VPN activity.
 """
 }
 
@@ -329,11 +483,40 @@ Setting: {political_context.time_period}
         """Get expected JSON fields for document type."""
         field_templates = {
             "email": '"from": "...", "to": "...", "subject": "...", "body": "..."',
-            "diary": '"date": "...", "author": "...", "content": "...", "mood": "..."',
-            "internal_memo": '"from": "...", "to": "...", "subject": "...", "content": "..."',
-            "badge_log": '"facility": "...", "log_date": "...", "entries": [...]',
-            "witness_statement": '"witness_name": "...", "statement_date": "...", "statement": "..."',
-            "police_report": '"case_number": "...", "officer_name": "...", "report": "..."'
+            
+            "diary": '"date": "...", "author": "...", "content": "...", "mood": "...", "entries": [{"time": "...", "text": "..."}]',
+            
+            "internal_memo": '"from": "...", "to": "...", "subject": "...", "date": "...", "content": "...", "sections": [{"heading": "...", "text": "..."}]',
+            
+            "badge_log": '"facility": "...", "log_date": "...", "system_version": "...", "entries": [{"timestamp": "...", "badge_id": "...", "user": "...", "location": "...", "event": "...", "status": "..."}]',
+            
+            "witness_statement": '"witness_name": "...", "statement_date": "...", "interviewer": "...", "location": "...", "statement": "...", "details": [{"question": "...", "answer": "..."}]',
+            
+            "police_report": '"case_number": "...", "officer_name": "...", "report_date": "...", "incident_date": "...", "incident_location": "...", "report": "...", "evidence_noted": ["..."], "witnesses": [{"name": "...", "statement": "..."}], "status": "..."',
+            
+            "login_history": '"system": "...", "log_period_start": "...", "log_period_end": "...", "authentication_events": [{"timestamp": "...", "user_id": "...", "username": "...", "ip_address": "...", "device": "...", "event": "...", "status": "...", "notes": "..."}]',
+            
+            "server_log": '"server_name": "...", "log_date": "...", "log_level": "...", "entries": [{"timestamp": "...", "level": "...", "service": "...", "message": "...", "details": "..."}]',
+            
+            "firewall_log": '"firewall_id": "...", "log_date": "...", "entries": [{"timestamp": "...", "source_ip": "...", "dest_ip": "...", "source_port": "...", "dest_port": "...", "protocol": "...", "action": "...", "rule": "...", "bytes": "..."}]',
+            
+            "network_log": '"network_segment": "...", "log_date": "...", "entries": [{"timestamp": "...", "source": "...", "destination": "...", "protocol": "...", "bytes_sent": "...", "bytes_received": "...", "status": "...", "connection_id": "..."}]',
+            
+            "access_control": '"facility": "...", "log_date": "...", "system_version": "...", "entries": [{"timestamp": "...", "event_type": "...", "badge_id": "...", "user": "...", "clearance_level": "...", "zone": "...", "door": "...", "result": "...", "notes": "..."}], "system_events": [{"timestamp": "...", "event": "..."}]',
+            
+            "vpn_log": '"vpn_gateway": "...", "log_date": "...", "entries": [{"timestamp": "...", "user_id": "...", "client_ip": "...", "server_ip": "...", "event": "...", "protocol": "...", "encryption": "...", "bytes_transferred": "...", "duration": "..."}]',
+            
+            "door_access_log": '"facility": "...", "log_date": "...", "entries": [{"timestamp": "...", "door_id": "...", "badge_id": "...", "user": "...", "action": "...", "duration_open": "...", "sensor_status": "..."}]',
+            
+            "it_inventory": '"department": "...", "inventory_date": "...", "items": [{"asset_id": "...", "device_type": "...", "assigned_to": "...", "location": "...", "serial_number": "...", "status": "...", "notes": "..."}]',
+            
+            "security_scan": '"scan_id": "...", "scan_date": "...", "scan_type": "...", "results": [{"timestamp": "...", "target": "...", "finding": "...", "severity": "...", "description": "..."}]',
+            
+            "device_registry": '"registry_date": "...", "devices": [{"device_id": "...", "device_name": "...", "device_type": "...", "mac_address": "...", "ip_address": "...", "owner": "...", "location": "...", "last_seen": "...", "status": "..."}]',
+            
+            "asset_database": '"database": "...", "query_date": "...", "records": [{"asset_id": "...", "asset_type": "...", "owner": "...", "location": "...", "value": "...", "status": "...", "acquisition_date": "...", "notes": "..."}]',
+            
+            "phone_record": '"record_date": "...", "calls": [{"timestamp": "...", "caller": "...", "recipient": "...", "duration": "...", "call_type": "...", "notes": "..."}]'
         }
         
         return field_templates.get(doc_type, '"content": "..."')

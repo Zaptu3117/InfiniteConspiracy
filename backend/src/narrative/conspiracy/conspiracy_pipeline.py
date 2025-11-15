@@ -289,7 +289,10 @@ class ConspiracyPipeline:
                 )
                 sg.evidence_nodes = evidence_nodes
                 sg.inference_nodes = inference_nodes
-                # Crypto keys will be collected later
+                # Store crypto keys in subgraph for later collection
+                if not hasattr(sg, 'crypto_keys'):
+                    sg.crypto_keys = []
+                sg.crypto_keys.extend(crypto_keys)
         
         logger.info(f"   ✅ Populated {len(subgraphs)} sub-graphs")
     
@@ -316,9 +319,11 @@ class ConspiracyPipeline:
     
     def _collect_crypto_keys(self, subgraphs):
         """Collect all crypto keys from sub-graphs."""
-        # In full implementation, would extract from crypto nodes
-        # For now, return empty list (keys are embedded in nodes)
-        return []
+        crypto_keys = []
+        for sg in subgraphs:
+            if hasattr(sg, 'crypto_keys') and sg.crypto_keys:
+                crypto_keys.extend(sg.crypto_keys)
+        return crypto_keys
     
     async def _generate_images(self, image_clues, premise):
         """Generate actual images from image clue prompts."""

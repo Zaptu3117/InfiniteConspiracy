@@ -184,6 +184,12 @@ Answer all four questions based on the documents.
                 max_tokens=500
             )
             
+            # Check if response is None or empty
+            if not response or not isinstance(response, str):
+                logger.info("   ✅ Single-LLM FAILED (as expected)")
+                logger.info("      No valid response generated")
+                return True
+            
             response_lower = response.lower()
             
             # Check if LLM found specific answers

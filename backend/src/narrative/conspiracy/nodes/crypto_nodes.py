@@ -133,8 +133,11 @@ class CryptoNodeGenerator:
         
         logger.info(f"   Generating crypto chain {subgraph_id}...")
         
-        # Determine number of keys needed
-        num_keys = random.randint(1, 2)  # 1-2 keys per chain
+        # Determine number of encrypted phrases needed
+        num_phrases = random.randint(2, 3)  # 2-3 encrypted phrases per chain
+        
+        # Generate one key per phrase to ensure all phrases have keys
+        num_keys = num_phrases
         
         # Generate crypto keys
         crypto_keys = await self._generate_crypto_keys(
@@ -145,12 +148,11 @@ class CryptoNodeGenerator:
             config
         )
         
-        # Generate encrypted phrases
-        num_phrases = random.randint(2, 4)
+        # Generate encrypted phrases (with all keys)
         encrypted_evidence = await self._generate_encrypted_phrases(
             subgraph_id,
             premise,
-            crypto_keys[0] if crypto_keys else None,
+            crypto_keys,  # Pass all keys, not just first one
             num_phrases,
             contributes_to,
             config
@@ -240,12 +242,15 @@ Method: {premise.how}
         self,
         subgraph_id: str,
         premise: ConspiracyPremise,
-        crypto_key: Optional[CryptoKey],
+        crypto_keys: List[CryptoKey],
         num_phrases: int,
         contributes_to: AnswerDimension,
         config: Dict[str, Any]
     ) -> List[EvidenceNode]:
         """Generate phrases that will be encrypted."""
+        
+        if not crypto_keys:
+            return []
         
         # Focus on WHAT or HOW based on contribution
         if contributes_to == AnswerDimension.WHAT:
@@ -258,7 +263,7 @@ Conspiracy: {premise.conspiracy_name}
 {focus}
 """
         
-        key_info = f"Key reference: {crypto_key.inference_description}" if crypto_key else "No key yet"
+        key_info = f"Key reference: {crypto_keys[0].inference_description}"
         
         # Build prompt
         prompt = CRYPTO_EVIDENCE_PROMPT.format(
@@ -281,9 +286,12 @@ Conspiracy: {premise.conspiracy_name}
             else:
                 phrases_data = response.get("phrases", [])
             
-            # Create evidence nodes
+            # Create evidence nodes - one per phrase, each with its own key
             evidence_nodes = []
             for i, data in enumerate(phrases_data[:num_phrases]):
+                # Get the corresponding key for this phrase (one key per phrase)
+                crypto_key = crypto_keys[i] if i < len(crypto_keys) else crypto_keys[0]
+                
                 # The encrypted phrase will be added during document generation
                 node = EvidenceNode(
                     node_id=f"{subgraph_id}_crypto_ev_{i}",
@@ -291,7 +299,7 @@ Conspiracy: {premise.conspiracy_name}
                     content=data.get("plaintext", "Secret message"),
                     encrypted_phrase=data.get("plaintext"),  # Will be encrypted later
                     encryption_type=random.choice(["caesar", "vigenere"]),
-                    key_hint=f"The key is: {crypto_key.inference_description}" if crypto_key else None,
+                    key_hint=f"The key is: {crypto_key.inference_description}",
                     assigned_doc_type=data.get("doc_type", "email"),
                     isolated=True,
                     importance="key",
@@ -299,15 +307,14 @@ Conspiracy: {premise.conspiracy_name}
                 )
                 evidence_nodes.append(node)
                 
-                # Link key to this node
-                if crypto_key:
-                    crypto_key.unlocks_node_id = node.node_id
+                # Link this specific key to this specific node
+                crypto_key.unlocks_node_id = node.node_id
             
             return evidence_nodes
         
         except Exception as e:
             logger.error(f"   ❌ Encrypted phrase generation failed: {e}")
-            return self._create_fallback_encrypted_evidence(subgraph_id, num_phrases, crypto_key)
+            return self._create_fallback_encrypted_evidence(subgraph_id, num_phrases, crypto_keys[0] if crypto_keys else None)
     
     def _generate_key_hints(
         self,
