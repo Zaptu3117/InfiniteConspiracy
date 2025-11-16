@@ -179,7 +179,7 @@ KUSAMA_CHAIN_ID=1000
 🚀 **Next Steps:**
 1. Test token limits with real conspiracy:
    ```bash
-   uv run python test_full_e2e_with_contract.py --contract 0x5FbDB2315678afecb367f032d93F642f64180aa3 --difficulty 5 --docs 10
+   uv run python tests/test_full_e2e_with_contract.py --contract 0x5FbDB2315678afecb367f032d93F642f64180aa3 --difficulty 5 --docs 10
    ```
 
 2. Deploy to testnet when ready:

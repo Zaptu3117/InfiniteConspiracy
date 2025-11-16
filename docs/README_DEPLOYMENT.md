@@ -27,19 +27,19 @@
    - Uploads to Arkiv
    - Can be run many times with same contract
 
-3. **`test_blockchain_only.py`** - Test blockchain with dummy data
+3. **`tests/test_blockchain_only.py`** - Test blockchain with dummy data
    ```bash
-   python test_blockchain_only.py --contract 0x...
+   python tests/test_blockchain_only.py --contract 0x...
    ```
 
-4. **`test_full_e2e_with_contract.py`** - Full e2e with contract
+4. **`tests/test_full_e2e_with_contract.py`** - Full e2e with contract
    ```bash
-   python test_full_e2e_with_contract.py --contract 0x...
+   python tests/test_full_e2e_with_contract.py --contract 0x...
    ```
 
 ### Documentation
-- **`TESTNET_DEPLOYMENT_GUIDE.md`** - Complete deployment guide
-- **`FULL_E2E_GUIDE.md`** - Technical implementation guide
+- **`TESTNET_DEPLOYMENT_GUIDE.md`** - Complete deployment guide for all networks
+- **`ENV_VARIABLES_GUIDE.md`** - Environment configuration reference
 
 ---
 

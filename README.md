@@ -5,11 +5,17 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#hackathon">Hackathon</a>
+  <a href="#-team">Team</a> •
+  <a href="#-demo--pitch-materials">Demo & Pitch</a> •
+  <a href="#-features">Features</a> •
+  <a href="#%EF%B8%8F-arkiv-integration-technical-implementation">Arkiv Integration</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-documentation">Documentation</a>
+</p>
+
+<p align="center">
+  <strong>🏆 Built for sub0 2025 Hackathon</strong><br>
+  <em>Arkiv Main Track | Kusama Bounty | Polkadot Main Track</em>
 </p>
 
 ---
@@ -31,6 +37,32 @@ Each mystery is **validated** to ensure:
 2. ✅ Guided multi-hop reasoning CAN solve it (not impossible)
 3. ✅ Requires 3-7 reasoning steps minimum
 4. ✅ Clues scattered across 20-25 documents
+
+---
+
+## 👥 Team
+
+**Felix Zapata** - Technical Lead & Smart Contracts  
+_Full-stack developer, blockchain architect_
+
+**Clémence Plenet** - Product & Narrative Design  
+_Game designer, UX specialist_
+
+---
+
+## 🎬 Demo & Pitch Materials
+
+| Resource | Link |
+|----------|------|
+| 🎮 **Live Demo** | [demo.infiniteconspiracy.xyz](https://frontend-1zw3957uj-clemences-projects-c5bedfda.vercel.app/) |
+| 📹 **Pitch Video** | [Watch on Google Drive](https://drive.google.com/drive/folders/1nmS4Jnbtfx6JdVRLNRZX5f_OziBxtKQr?usp=sharing) _(3-min demo)_ |
+| 📊 **Pitch Deck** | [View Deck](https://drive.google.com/drive/folders/1fJuVlFbf387FSuIQFGmjFFdgCY6s9SED?usp=sharing) _(Google Slides)_ |
+| 📖 **Documentation** | [Full Docs](./docs/) |
+| 🗓️ **Milestone 2 Plan** | [MILESTONE-2-PLAN.md](./MILESTONE-2-PLAN.md) |
+
+> **Note:** Add your actual URLs before submission. Demo deployed on testnet (Paseo), smart contracts verified on Kusama Asset Hub.
+
+---
 
 ## 🚀 Features
 
@@ -120,6 +152,106 @@ Each mystery is **validated** to ensure:
 **Note:** Arkiv and Kusama are **two separate networks**:
 - **Arkiv**: Data storage only (documents, images, metadata)
 - **Kusama**: Smart contracts only (bounties, submissions, leaderboard)
+
+## 🗄️ Arkiv Integration: Technical Implementation
+
+### Constraint → Core Gameplay Mechanic
+
+**Challenge:** Arkiv entities are **public by design**—no private data storage.
+
+**Solution:** Transform limitation into game design:
+- **Concept:** Clues hidden in plain sight across 20-25 public documents
+- **Gamification:** "Finding needles in a public haystack" = detective skill test
+- **Anti-cheat:** Answer hash stored on-chain, not in Arkiv metadata
+
+### Arkiv Features Embedded in Logic
+
+**1. Entity CRUD with Typed Payloads**
+```python
+# Metadata: JSON payload
+entity = {
+    "payload": json.dumps(mystery_data).encode('utf-8'),
+    "content_type": "application/json",
+    "attributes": {"mystery_id": id, "type": "mystery_metadata"}
+}
+
+# Images: Raw binary payload  
+entity = {
+    "payload": image_bytes,
+    "content_type": "image/png",
+    "attributes": {"mystery_id": id, "type": "image"}
+}
+```
+
+**2. BTL (Blocks-to-Live) for Time-Limited Mysteries**
+```python
+# 7-day lifecycle (604800 seconds / 12s per block)
+btl = 604800 // 12  # ~50,400 blocks
+```
+- Auto-cleanup after expiry
+- Sync with smart contract expiration
+- No manual deletion needed
+
+**3. Attribute-Based Queries (No Spoilers)**
+```python
+# Frontend queries by mystery_id + entity type
+query = 'mystery_id = "xyz" and type = "email"'
+entities = client.query_entities(query, limit=100)
+```
+- **NO clue indicators** in attributes
+- **NO proof steps** exposed
+- Only: `mystery_id`, `type`, `document_id`, `created_at`
+
+**4. Batch Operations for Multi-Entity Mysteries**
+```python
+# Push 1 metadata + 20 documents + 8 images in batches
+for batch in chunk(entities, size=10):
+    receipt = client.create_entities_batch(batch)
+```
+- Efficient bulk creation
+- 30+ entities per mystery
+- Reduces API calls 3x
+
+**5. Content-Type Flexibility**
+- `application/json`: Structured documents (emails, logs, reports)
+- `image/png`: Encrypted visual clues
+- Mixed payload types in single mystery
+
+### Why No Backend API Needed
+
+```
+Traditional:                    Arkiv Architecture:
+Frontend → Backend API          Frontend → Arkiv (direct)
+         → Database                      ↓
+         → Response                   Entities
+                                    (queryable)
+
+Problems:                       Benefits:
+- Single point of failure       ✅ Decentralized retrieval
+- Scaling costs                 ✅ No server uptime costs  
+- Cache complexity              ✅ Query by attributes
+- Data persistence              ✅ TTL auto-cleanup
+```
+
+### Code References
+
+- **Entity Builder:** `backend/src/arkiv_integration/entity_builder.py`
+- **Batch Pusher:** `backend/src/arkiv_integration/pusher.py`
+- **Client Wrapper:** `backend/src/arkiv_integration/client.py`
+- **Document Models:** `backend/src/models/document.py`
+
+### Data Flow
+
+```
+1. Backend generates mystery (20-25 documents)
+2. Batch-push to Arkiv with BTL=7 days
+3. Store mystery_id + answer_hash on Kusama
+4. Frontend queries Arkiv by mystery_id
+5. Player submits answer to Kusama contract
+6. After 7 days: Arkiv auto-deletes, proof revealed on-chain
+```
+
+**Key Innovation:** Separation of **evidence (Arkiv)** from **validation (Kusama)** creates trust-minimized detective game where data is provably public but answers remain secret until solved.
 
 ## 📦 Quick Start
 
@@ -370,10 +502,17 @@ MIT License - see [LICENSE](./LICENSE) file
 
 ## 📧 Contact
 
-For questions or support:
-- Open an issue
-- Join our Discord (coming soon)
-- Email: [your-email]
+**Felix Zapata** - Technical Lead  
+- GitHub: [@felixzapata](https://github.com/felixzapata)
+- Email: felix@infiniteconspiracy.xyz
+
+**Clémence Plenet** - Product Lead  
+- GitHub: [@clemenceplenet](https://github.com/clemenceplenet)
+- Email: clemence@infiniteconspiracy.xyz
+
+**Project:**
+- Open an issue: [GitHub Issues](https://github.com/your-org/InvestigationBackEnd/issues)
+- Join our Discord: [discord.gg/infiniteconspiracy](https://discord.gg/...) _(coming soon)_
 
 ---
 

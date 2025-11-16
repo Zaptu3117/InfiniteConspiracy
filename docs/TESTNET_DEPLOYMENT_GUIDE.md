@@ -187,5 +187,5 @@ Each conspiracy:
 
 **Query Arkiv:**
 ```bash
-python test_query_arkiv.py --filter 'network = "paseo"'
+python tests/test_query_arkiv.py --filter 'network = "paseo"'
 ```

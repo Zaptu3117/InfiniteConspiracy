@@ -5,8 +5,9 @@ Complete documentation for the Infinite Conspiracy project - a blockchain-based 
 ## 📚 Documentation Structure
 
 ### 🚀 Getting Started
-- [README.md](../README.md) - Project overview and quick start
-- [SETUP.md](../SETUP.md) - Complete installation guide
+- [README.md](../README.md) - Project overview, installation, and quick start
+- [TESTNET_DEPLOYMENT_GUIDE.md](./TESTNET_DEPLOYMENT_GUIDE.md) - Deployment instructions
+- [ENV_VARIABLES_GUIDE.md](./ENV_VARIABLES_GUIDE.md) - Environment configuration
 
 ### 🏗️ Architecture
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System design and data flow
@@ -66,8 +67,7 @@ See [contracts/docs/README.md](../contracts/docs/README.md) for complete contrac
 
 ```
 InvestigationBackEnd/
-├── README.md                    # Project overview
-├── SETUP.md                     # Installation guide
+├── README.md                    # Project overview, installation, quick start
 ├── LICENSE                      # MIT License
 ├── pyproject.toml              # Python package config
 ├── uv.lock                     # Package lockfile
@@ -160,19 +160,14 @@ Mysteries are validated to ensure:
 - Contracts documentation (10+ comprehensive guides)
 - All code is documented with inline comments
 
-### 🗑️ Removed (Outdated)
-- CONSPIRACY_SUMMARY.md
-- PROJECT_STATUS.md
-- CONSPIRACY_IMPLEMENTATION_STATUS.md
-- CONSPIRACY_SYSTEM_PROGRESS.md
-- DOCUMENT_TYPE_FIX_SUMMARY.md
-- FIXES_SUMMARY.md
-- ARCHITECTURE_CLARIFICATION.md
-- backend/ASSESSMENT_SUMMARY.md
-- backend/README_ASSESSMENT.md
-- backend/FIXES_NEEDED.md
-- backend/BACKEND_ASSESSMENT_REPORT.md
-- backend/MULTI_HOP_VALIDATION_IMPLEMENTED.md
+### 🗑️ Removed During Cleanup (November 2025)
+- SETUP.md → merged into README.md
+- ANSWER_EXTRACTION_FIX.md → interim doc
+- ASSESSMENT_SUMMARY.md → interim doc
+- CONTRACT_ANSWER_FORMAT_UPDATE.md → interim doc
+- FULL_E2E_GUIDE.md → outdated
+- PIPELINE_ASSESSMENT.md → interim doc
+- Various interim assessment and fix summary documents
 
 ## 🚀 Quick Start Paths
 
@@ -231,10 +226,10 @@ python scripts/register_on_chain.py <mystery_id>
 ## 📖 Learning Path
 
 ### Beginner
-1. Read [README.md](../README.md) for project overview
-2. Follow [SETUP.md](../SETUP.md) to install
-3. Read [ARCHITECTURE.md](./ARCHITECTURE.md) to understand the system
-4. Try [backend/docs/QUICK_START.md](../backend/docs/QUICK_START.md)
+1. Read [README.md](../README.md) for project overview and installation
+2. Read [ARCHITECTURE.md](./ARCHITECTURE.md) to understand the system
+3. Follow [ENV_VARIABLES_GUIDE.md](./ENV_VARIABLES_GUIDE.md) to configure
+4. Try [backend/docs/QUICK_START.md](../backend/docs/QUICK_START.md) (if exists) or generate your first mystery
 
 ### Intermediate
 1. Read [backend/docs/MYSTERY_GENERATION.md](../backend/docs/MYSTERY_GENERATION.md)
