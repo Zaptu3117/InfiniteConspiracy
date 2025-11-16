@@ -1,404 +1,434 @@
 # Project Structure
 
-Complete directory and file layout for Infinite Conspiracy.
+Complete file organization and directory structure for Infinite Conspiracy.
 
-## Root Structure
+## Repository Root
 
 ```
 InvestigationBackEnd/
-├── backend/              # Python backend for mystery generation
-├── contracts/            # Solidity smart contracts
-├── docs/                 # Documentation
-├── .gitignore
-├── LICENSE
-└── README.md
+├── README.md                    # Project overview, features, quick start
+├── SETUP.md                     # Complete installation guide
+├── LICENSE                      # MIT License
+├── pyproject.toml              # Python package configuration
+├── uv.lock                     # uv package lockfile
+│
+├── backend/                    # Python backend (mystery generation)
+├── contracts/                  # Smart contracts (Solidity)
+└── docs/                       # Root-level documentation
 ```
 
 ## Backend Structure
 
 ```
 backend/
-├── config/                          # Configuration files
-│   ├── cipher_configs.json          # Cipher types and settings
-│   ├── document_types.json          # Document template configs
-│   └── langgraph_config.yaml        # LangGraph pipeline settings
+├── config/
+│   └── narrator_config.yaml    # Pipeline configuration
 │
-├── scripts/                         # Executable scripts
-│   ├── generate_mystery.py          # Generate complete mystery
-│   ├── push_to_arkiv.py            # Upload to Arkiv
-│   ├── register_on_chain.py        # Register on blockchain
-│   └── reveal_proof.py             # Reveal proof after expiry
+├── scripts/                    # Utility scripts
+│   ├── generate_mystery.py     # Main generation script
+│   ├── push_to_arkiv.py       # Arkiv deployment
+│   ├── register_on_chain.py   # Blockchain registration
+│   └── validate_mystery.py    # Mystery validation
 │
-├── src/                            # Source code
-│   ├── arkiv/                      # Arkiv integration
+├── src/                        # Source code
+│   ├── arkiv_integration/     # Arkiv client and entity builders
 │   │   ├── __init__.py
-│   │   ├── client.py               # Arkiv SDK wrapper
-│   │   ├── entity_builder.py      # Build Arkiv entities
-│   │   └── pusher.py               # Push to Arkiv
+│   │   ├── client.py          # Arkiv client wrapper
+│   │   ├── entity_builder.py # Entity construction
+│   │   └── pusher.py          # Batch upload logic
 │   │
-│   ├── blockchain/                 # Blockchain integration
+│   ├── blockchain/            # Web3 and contract interaction
 │   │   ├── __init__.py
-│   │   ├── web3_client.py          # Web3.py wrapper
-│   │   ├── mystery_registration.py # Register mysteries
-│   │   └── proof_manager.py        # Proof revelation
+│   │   ├── web3_client.py     # Web3 client wrapper
+│   │   ├── mystery_registration.py  # Contract calls
+│   │   └── proof_manager.py   # Proof revelation
 │   │
-│   ├── documents/                  # Document generation
+│   ├── documents/             # Document generation and crypto
 │   │   ├── __init__.py
-│   │   ├── generator.py            # Document generator
-│   │   ├── cryptography.py         # Cipher management
-│   │   ├── cross_reference.py      # Cross-reference chains
-│   │   └── templates/              # Jinja2 templates
-│   │       ├── email.json.j2
-│   │       ├── diary.json.j2
-│   │       ├── police_report.json.j2
-│   │       └── ... (more templates)
+│   │   ├── generator.py       # Document content generation
+│   │   └── cryptography.py    # Cipher implementations
 │   │
-│   ├── images/                     # Image generation
+│   ├── images/                # Image generation and validation
 │   │   ├── __init__.py
-│   │   ├── generator.py            # Replicate API integration
-│   │   └── vlm_validator.py        # GPT-4V validation
+│   │   ├── generator.py       # Replicate API integration
+│   │   └── vlm_validator.py   # GPT-4V validation
 │   │
-│   ├── models/                     # Data models
+│   ├── models/                # Data models
 │   │   ├── __init__.py
-│   │   ├── mystery.py              # Mystery model
-│   │   ├── document.py             # Document model
-│   │   ├── proof_tree.py           # Proof tree model
-│   │   └── validation_result.py    # Validation result model
+│   │   ├── mystery.py         # Mystery data model
+│   │   ├── document.py        # Document data model
+│   │   ├── conspiracy.py      # Conspiracy data model
+│   │   ├── proof_tree.py      # Proof tree model
+│   │   └── validation_result.py  # Validation results
 │   │
-│   ├── narrative/                  # LangGraph pipeline
+│   ├── narrative/             # Mystery generation pipelines
 │   │   ├── __init__.py
-│   │   ├── langgraph_pipeline.py   # Complete pipeline
-│   │   ├── nodes/                  # Pipeline nodes
+│   │   ├── pipeline.py        # LLM narrative pipeline
+│   │   ├── crypto_integrator.py  # Cryptography integration
+│   │   ├── red_herrings.py    # Red herring generation
+│   │   │
+│   │   ├── conspiracy/        # Conspiracy pipeline
 │   │   │   ├── __init__.py
-│   │   │   ├── initialize.py
-│   │   │   ├── select_documents.py
-│   │   │   ├── generate_proof_tree.py
-│   │   │   ├── generate_content.py
-│   │   │   ├── apply_crypto.py
-│   │   │   ├── inject_red_herrings.py
-│   │   │   ├── generate_images.py
-│   │   │   ├── validate.py
-│   │   │   └── finalize.py
-│   │   └── state.py                # Pipeline state
+│   │   │   ├── conspiracy_pipeline.py  # Main conspiracy pipeline
+│   │   │   ├── political_context_generator.py
+│   │   │   ├── conspiracy_generator.py
+│   │   │   ├── answer_template_generator.py
+│   │   │   ├── subgraph_generator.py
+│   │   │   ├── subgraph_types.py
+│   │   │   ├── document_generator.py
+│   │   │   ├── document_name_generator.py
+│   │   │   ├── document_subgraph_mapper.py
+│   │   │   ├── character_enhancer.py
+│   │   │   ├── phrase_encryptor.py
+│   │   │   ├── image_clue_mapper.py
+│   │   │   ├── red_herring_builder.py
+│   │   │   └── nodes/         # Evidence node generators
+│   │   │       ├── __init__.py
+│   │   │       ├── identity_nodes.py
+│   │   │       ├── psychological_nodes.py
+│   │   │       └── crypto_nodes.py
+│   │   │
+│   │   ├── document_gen/      # Document generation
+│   │   │   ├── __init__.py
+│   │   │   ├── parallel_generator.py  # Parallel async generation
+│   │   │   └── document_prompts.py    # LLM prompts
+│   │   │
+│   │   ├── graph/             # Narrative graph
+│   │   │   ├── __init__.py
+│   │   │   └── narrative_graph.py
+│   │   │
+│   │   └── narrator/          # Narrator orchestration
+│   │       ├── __init__.py
+│   │       ├── narrator_orchestrator.py  # Main orchestrator
+│   │       ├── step_minus1_premise.py    # Premise generation
+│   │       ├── step0_proof_tree.py       # Proof tree
+│   │       ├── step1_characters.py       # Character generation
+│   │       ├── step2_timeline.py         # Timeline generation
+│   │       ├── step3_locations.py        # Location generation
+│   │       ├── step4_document_plan.py    # Document planning
+│   │       ├── step5_graph_assembly.py   # Graph assembly
+│   │       ├── clue_fragmenter.py        # Clue distribution
+│   │       └── identity_injector.py      # Identity injection
 │   │
-│   ├── utils/                      # Utilities
+│   ├── utils/                 # Utilities
 │   │   ├── __init__.py
-│   │   ├── config.py               # Config management
-│   │   ├── logger.py               # Logging setup
-│   │   └── llm_clients.py          # LLM API wrappers
+│   │   ├── config.py          # Configuration loader
+│   │   ├── logger.py          # Logging setup
+│   │   └── llm_clients.py     # LLM client wrappers
 │   │
-│   └── validation/                 # Anti-automation
+│   └── validation/            # Validation systems
 │       ├── __init__.py
-│       └── anti_automation.py      # Validation logic
+│       └── conspiracy_validator.py  # Mystery validation
 │
-├── tests/                          # Unit tests
-│   ├── test_models.py
-│   ├── test_arkiv.py
-│   ├── test_documents.py
-│   └── test_validation.py
+├── tests/                     # Test suite
+│   ├── README.md              # Testing documentation
+│   ├── run_all_tests.py       # Master test runner
+│   ├── test_setup.py          # Setup validation
+│   ├── test_llm_clients.py    # LLM client tests
+│   ├── test_arkiv.py          # Arkiv integration tests
+│   ├── test_web3.py           # Web3 connection tests
+│   └── test_replicate.py      # Image generation tests
 │
-├── outputs/                        # Generated outputs
-│   ├── mysteries/                  # Mystery directories
-│   │   └── <mystery_id>/
-│   │       ├── mystery.json
-│   │       ├── proof_tree.json
-│   │       ├── documents/
-│   │       └── images/
-│   └── logs/                       # Log files
+├── outputs/                   # Generated mysteries
+│   ├── mysteries/             # Mystery output directory
+│   │   └── mystery_<id>/      # Individual mystery
+│   │       ├── mystery.json   # Complete mystery data
+│   │       ├── documents/     # Document JSON files
+│   │       └── images/        # Generated images
+│   ├── conspiracies/          # Conspiracy mysteries
+│   └── logs/                  # Generation logs
 │
-├── env.example                     # Environment template
-├── requirements.txt                # Python dependencies
-└── test_setup.py                  # Setup verification
+├── docs/                      # Backend documentation
+│   ├── README.md              # Documentation index
+│   ├── BACKEND_OVERVIEW.md    # System architecture
+│   ├── INSTALLATION.md        # Setup guide
+│   ├── QUICK_START.md         # Quick start guide
+│   ├── MYSTERY_GENERATION.md  # Generation pipeline
+│   ├── CONSPIRACY_SYSTEM.md   # Conspiracy details
+│   ├── DOCUMENT_GENERATION.md # Document system
+│   ├── CRYPTOGRAPHY.md        # Cipher system
+│   ├── VALIDATION.md          # Validation system
+│   ├── ARKIV_INTEGRATION.md   # Arkiv deployment
+│   ├── BLOCKCHAIN_INTEGRATION.md  # Blockchain integration
+│   ├── IMAGE_GENERATION.md    # Image generation
+│   ├── API_MODELS.md          # Data models reference
+│   ├── API_UTILITIES.md       # Utilities reference
+│   ├── CONFIGURATION.md       # Config reference
+│   ├── TESTING.md             # Testing guide
+│   ├── E2E_TESTING_GUIDE.md   # End-to-end testing
+│   ├── FRONTEND_ARKIV_INTEGRATION.md  # Frontend Arkiv guide
+│   ├── FRONTEND_QUICK_REFERENCE.md    # Frontend reference
+│   └── ARKIV_ATTRIBUTES_DESIGN.md     # Arkiv schema
+│
+├── env.example                # Environment template
+└── requirements.txt           # Python dependencies (deprecated, use pyproject.toml)
 ```
 
 ## Contracts Structure
 
 ```
 contracts/
-├── contracts/                      # Solidity contracts
-│   └── InfiniteConspiracy.sol     # Main game contract
+├── contracts/                 # Solidity source files
+│   └── InfiniteConspiracy.sol # Main game contract
 │
-├── scripts/                        # Deployment scripts
-│   ├── deploy.js                   # Deploy contract
-│   └── verify.js                   # Verify on explorer
+├── scripts/                   # Deployment and utility scripts
+│   ├── deploy.js              # Main deployment script
+│   └── verify.js              # Contract verification
 │
-├── test/                          # Contract tests
-│   └── InfiniteConspiracy.test.js # Unit tests
+├── test/                      # Contract test suite
+│   └── InfiniteConspiracy.test.js  # Contract tests
 │
-├── artifacts/                     # Compiled contracts
-├── cache/                         # Build cache
+├── docs/                      # Contract documentation
+│   ├── README.md              # Documentation index
+│   ├── CONTRACTS_OVERVIEW.md  # System architecture
+│   ├── INSTALLATION.md        # Setup guide
+│   ├── DEPLOYMENT.md          # Deployment guide
+│   ├── CONTRACT_REFERENCE.md  # Complete API reference
+│   ├── GAME_MECHANICS.md      # Game mechanics
+│   ├── ECONOMICS.md           # Fees and bounties
+│   ├── TESTING.md             # Testing guide
+│   ├── SECURITY.md            # Security considerations
+│   ├── INTEGRATION.md         # Integration guide
+│   ├── KUSAMA_ASSET_HUB.md    # Network details
+│   └── TESTNET_GUIDE.md       # Testnet usage
 │
-├── hardhat.config.js              # Hardhat configuration
-├── package.json                   # Node dependencies
-└── deployment.json                # Deployment info
+├── artifacts/                 # Compiled contracts (generated)
+├── cache/                     # Hardhat cache (generated)
+├── node_modules/              # NPM dependencies (generated)
+├── .env.example               # Environment template
+├── .env                       # Environment variables (gitignored)
+├── hardhat.config.js          # Hardhat configuration
+└── package.json               # NPM package configuration
 ```
 
-## Documentation Structure
+## Root Documentation Structure
 
 ```
 docs/
-├── ARCHITECTURE.md                # System architecture
-├── ARKIV_INTEGRATION.md           # Arkiv usage guide
-├── SMART_CONTRACT.md              # Contract documentation
-├── FRONTEND_GUIDE.md              # Frontend integration
-├── PROJECT_STRUCTURE.md           # This file
-└── API_REFERENCE.md               # API reference (future)
+├── README.md                  # Documentation index
+├── ARCHITECTURE.md            # System design and data flow
+├── PROJECT_STRUCTURE.md       # This file
+├── ARKIV_INTEGRATION.md       # Data layer integration guide
+├── SMART_CONTRACT.md          # Blockchain integration guide
+└── FRONTEND_GUIDE.md          # Frontend development guide
 ```
 
-## Key File Purposes
+## Generated Outputs Structure
 
-### Backend Files
-
-**Configuration:**
-- `config/document_types.json` - Defines all document types, templates, and weights
-- `config/cipher_configs.json` - Cipher types and encryption settings
-- `config/langgraph_config.yaml` - Pipeline configuration and generation parameters
-
-**Scripts:**
-- `scripts/generate_mystery.py` - Main entry point for mystery generation
-- `scripts/push_to_arkiv.py` - Upload generated mystery to Arkiv
-- `scripts/register_on_chain.py` - Register mystery on smart contract
-- `scripts/reveal_proof.py` - Reveal proof after mystery expires
-
-**Core Modules:**
-- `src/models/` - Pydantic data models for type safety
-- `src/utils/` - Configuration, logging, LLM clients
-- `src/arkiv/` - Arkiv SDK integration and entity building
-- `src/blockchain/` - Web3 integration and contract interaction
-- `src/documents/` - Document generation, encryption, cross-references
-- `src/images/` - Image generation and VLM validation
-- `src/validation/` - Anti-automation testing
-- `src/narrative/` - LangGraph pipeline (modular mystery generation)
-
-### Contract Files
-
-**Smart Contracts:**
-- `contracts/InfiniteConspiracy.sol` - Main game logic
-  - Player inscription
-  - Mystery registration
-  - Answer submission with quadratic costs
-  - Bounty distribution
-  - Leaderboard
-  - Proof revelation
-
-**Scripts:**
-- `scripts/deploy.js` - Deploy contract to Kusama testnet
-- `scripts/verify.js` - Verify contract on block explorer
-
-**Tests:**
-- `test/InfiniteConspiracy.test.js` - Contract unit tests
-
-### Documentation Files
-
-- `ARCHITECTURE.md` - Overall system design and data flow
-- `ARKIV_INTEGRATION.md` - How to use Arkiv for storage
-- `SMART_CONTRACT.md` - Contract API and economics
-- `FRONTEND_GUIDE.md` - React integration examples
-- `PROJECT_STRUCTURE.md` - This file
-
-## File Naming Conventions
-
-### Python Files
-
-- **Modules:** `lowercase_with_underscores.py`
-- **Classes:** `PascalCase` (e.g., `ArkivClient`, `MysteryGenerator`)
-- **Functions:** `snake_case` (e.g., `generate_mystery`, `push_to_arkiv`)
-- **Constants:** `UPPER_SNAKE_CASE` (e.g., `MAX_DOCUMENTS`, `DEFAULT_TTL`)
-
-### Solidity Files
-
-- **Contracts:** `PascalCase.sol` (e.g., `InfiniteConspiracy.sol`)
-- **Functions:** `camelCase` (e.g., `inscribePlayer`, `submitAnswer`)
-- **Constants:** `UPPER_SNAKE_CASE` (e.g., `INSCRIPTION_FEE`)
-
-### JavaScript Files
-
-- **Scripts:** `kebab-case.js` (e.g., `deploy.js`)
-- **Functions:** `camelCase`
-- **Constants:** `UPPER_SNAKE_CASE`
-
-### JSON/YAML Files
-
-- **Config:** `snake_case.json` or `kebab-case.yaml`
-
-## Important Paths
-
-### Backend
-
-```python
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).parent.parent
-CONFIG_DIR = PROJECT_ROOT / "config"
-TEMPLATES_DIR = PROJECT_ROOT / "src" / "documents" / "templates"
-OUTPUTS_DIR = PROJECT_ROOT / "outputs"
-LOGS_DIR = OUTPUTS_DIR / "logs"
-```
-
-### Contracts
-
-```javascript
-const CONTRACTS_DIR = path.join(__dirname, "..", "contracts");
-const ARTIFACTS_DIR = path.join(__dirname, "..", "artifacts");
-const DEPLOYMENT_FILE = path.join(__dirname, "..", "deployment.json");
-```
-
-## Environment Variables
-
-Required environment variables (copy from `env.example` to `.env`):
-
-```bash
-# Backend
-CEREBRAS_API_KEY=...
-OPENAI_API_KEY=...
-REPLICATE_API_TOKEN=...
-ARKIV_PRIVATE_KEY=...
-ARKIV_RPC_URL=...
-ORACLE_PRIVATE_KEY=...
-CONTRACT_ADDRESS=...
-
-# Contracts
-DEPLOYER_PRIVATE_KEY=...
-KUSAMA_RPC_URL=...
-```
-
-## Generated Outputs
-
-### Mystery Directory
-
-Each mystery generates:
+### Mystery Output
 
 ```
-outputs/mysteries/<mystery_id>/
-├── mystery.json              # Complete mystery data
-├── proof_tree.json           # Proof tree structure
-├── documents/                # Individual document JSONs
+outputs/mysteries/mystery_<uuid>/
+├── mystery.json               # Complete mystery data
+│   ├── metadata               # Mystery metadata
+│   ├── answer                 # Correct answer
+│   ├── answer_hash            # Keccak256 hash
+│   ├── proof_tree             # Reasoning steps
+│   ├── proof_hash             # Proof tree hash
+│   ├── documents              # Document array
+│   ├── images                 # Image array
+│   └── validation_details     # Validation results
+│
+├── documents/                 # Document JSON files
 │   ├── doc_1_email.json
 │   ├── doc_2_badge_log.json
+│   ├── doc_3_network_log.json
 │   └── ...
-└── images/                   # Generated images
+│
+└── images/                    # Generated image files
     ├── img_1_badge.png
     ├── img_2_surveillance.png
     └── ...
 ```
 
-### Mystery JSON Structure
+### Conspiracy Output
 
-```json
+```
+outputs/conspiracies/conspiracy_<uuid>/
+├── conspiracy.json            # Complete conspiracy data
+│   ├── political_context      # Fictional world
+│   ├── premise                # WHO/WHAT/WHY/HOW
+│   ├── answer_template        # 4-part answer
+│   ├── subgraphs              # Evidence chains
+│   ├── documents              # Document array
+│   └── images                 # Image array
+│
+├── documents/                 # Document JSON files
+└── images/                    # Generated image files
+```
+
+## Configuration Files
+
+### Backend Configuration
+
+**`backend/config/narrator_config.yaml`**:
+```yaml
+llm:                           # LLM settings
+  temperature: 0.7
+  max_tokens: 2000
+
+documents:                     # Document generation
+  min_count: 15
+  max_count: 30
+  types: [...]
+
+cryptography:                  # Cipher settings
+  enabled: true
+  caesar_probability: 0.3
+  vigenere_probability: 0.2
+
+red_herrings:                  # Red herring settings
+  enabled: true
+  count: 3
+  types: [...]
+
+images:                        # Image generation
+  enabled: true
+  count: 5
+  model: "black-forest-labs/flux-schnell"
+```
+
+**`backend/.env`**:
+```bash
+# LLM APIs
+CEREBRAS_API_KEY=...
+OPENAI_API_KEY=...
+REPLICATE_API_TOKEN=...
+
+# Arkiv
+ARKIV_RPC_URL=...
+ARKIV_PRIVATE_KEY=0x...
+
+# Kusama
+KUSAMA_RPC_URL=...
+KUSAMA_CHAIN_ID=420420422
+ORACLE_PRIVATE_KEY=0x...
+CONTRACT_ADDRESS=0x...
+
+# Logging
+LOG_LEVEL=INFO
+LOG_DIR=outputs/logs
+```
+
+### Contracts Configuration
+
+**`contracts/.env`**:
+```bash
+DEPLOYER_PRIVATE_KEY=0x...
+ORACLE_PRIVATE_KEY=0x...
+KUSAMA_RPC_URL=...
+```
+
+**`contracts/hardhat.config.js`**:
+```javascript
 {
-  "metadata": {
-    "mystery_id": "uuid-here",
-    "question": "Who leaked the documents?",
-    "difficulty": 7,
-    "total_documents": 23,
-    "total_images": 8,
-    "created_at": 1730000000,
-    "expires_in": 604800
-  },
-  "answer": "Sarah Martinez",
-  "answer_hash": "0x...",
-  "proof_hash": "0x...",
-  "proof_tree": { /* inference nodes and validation steps */ },
-  "documents": [ /* document objects */ ],
-  "images": [ /* image metadata */ ],
-  "validation_passed": true,
-  "validation_details": { /* validation results */ }
+  solidity: "0.8.20",
+  networks: {
+    kusama: { ... },    // Mainnet
+    paseo: { ... }      // Testnet
+  }
 }
 ```
 
-## Development Workflow
+## Key Files by Function
 
-### 1. Setup
+### Mystery Generation
+- `backend/scripts/generate_mystery.py` - Entry point
+- `backend/src/narrative/pipeline.py` - LLM pipeline
+- `backend/src/narrative/conspiracy/conspiracy_pipeline.py` - Conspiracy pipeline
+- `backend/config/narrator_config.yaml` - Configuration
 
-```bash
-# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp env.example .env
-# Edit .env with API keys
+### Document Generation
+- `backend/src/narrative/document_gen/parallel_generator.py` - Parallel generation
+- `backend/src/narrative/document_gen/document_prompts.py` - LLM prompts
+- `backend/src/documents/generator.py` - Document content
 
-# Contracts
-cd contracts
-npm install
-cp .env.example .env
-# Edit .env with keys
-```
+### Cryptography
+- `backend/src/narrative/crypto_integrator.py` - Integration logic
+- `backend/src/documents/cryptography.py` - Cipher implementations
 
-### 2. Development
+### Validation
+- `backend/src/validation/conspiracy_validator.py` - Main validator
+- `backend/scripts/validate_mystery.py` - Validation script
 
-```bash
-# Test backend setup
-python backend/test_setup.py
+### Arkiv Integration
+- `backend/src/arkiv_integration/pusher.py` - Upload logic
+- `backend/scripts/push_to_arkiv.py` - Push script
 
-# Generate mystery (demo mode, no API calls)
-python backend/scripts/generate_mystery.py
+### Blockchain Integration
+- `backend/src/blockchain/mystery_registration.py` - Contract calls
+- `backend/scripts/register_on_chain.py` - Registration script
+- `contracts/contracts/InfiniteConspiracy.sol` - Smart contract
 
-# Deploy contract
-cd contracts
-npx hardhat run scripts/deploy.js --network kusama
+### Testing
+- `backend/tests/run_all_tests.py` - Master test runner
+- `backend/tests/test_*.py` - Individual test files
+- `contracts/test/InfiniteConspiracy.test.js` - Contract tests
 
-# Full workflow (requires API keys)
-python backend/scripts/generate_mystery.py --difficulty 7
-python backend/scripts/push_to_arkiv.py <mystery_id>
-python backend/scripts/register_on_chain.py <mystery_id> --bounty 10.0
-```
+## Important Directories
 
-### 3. Testing
+### Source Code
+- `backend/src/` - All backend Python code
+- `contracts/contracts/` - All Solidity contracts
 
-```bash
-# Backend tests
-cd backend
-pytest tests/ -v
+### Configuration
+- `backend/config/` - Backend configuration
+- `backend/.env` - Backend environment variables
+- `contracts/.env` - Contract environment variables
 
-# Contract tests
-cd contracts
-npx hardhat test
-```
+### Documentation
+- `docs/` - Root-level docs
+- `backend/docs/` - Backend-specific docs
+- `contracts/docs/` - Contract-specific docs
 
-## Dependencies
+### Outputs
+- `backend/outputs/mysteries/` - Generated mysteries
+- `backend/outputs/conspiracies/` - Generated conspiracies
+- `backend/outputs/logs/` - Generation logs
 
-### Python (backend/requirements.txt)
+### Tests
+- `backend/tests/` - Backend test suite
+- `contracts/test/` - Contract test suite
 
-```
-langchain>=0.1.0
-langgraph>=0.0.20
-arkiv-sdk>=0.1.19
-replicate>=0.15.0
-openai>=1.10.0
-web3>=6.15.0
-jinja2>=3.1.2
-python-dotenv>=1.0.0
-pydantic>=2.5.0
-pytest>=7.4.0
-pyyaml>=6.0.1
-aiofiles>=23.2.1
-```
+## File Naming Conventions
 
-### Node (contracts/package.json)
+### Backend Python Files
+- `snake_case.py` for all Python files
+- `test_*.py` for test files
+- `*_generator.py` for generators
+- `*_client.py` for API clients
 
-```json
-{
-  "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-  "@openzeppelin/contracts": "^5.0.0",
-  "hardhat": "^2.19.0",
-  "dotenv": "^16.3.1"
-}
-```
+### Contract Files
+- `PascalCase.sol` for Solidity contracts
+- `camelCase.js` for JavaScript files
 
-## Git Ignore Patterns
+### Documentation Files
+- `SCREAMING_SNAKE_CASE.md` for all docs
+- `README.md` for index files
 
-See `.gitignore` for complete list. Key exclusions:
-- `__pycache__/`, `*.pyc`
-- `venv/`, `env/`
-- `node_modules/`
-- `.env`, `backend/.env`, `contracts/.env`
-- `outputs/`
-- `contracts/artifacts/`, `contracts/cache/`
-- `.vscode/`, `.idea/`
+### Mystery Output Files
+- `mystery_<uuid>/` for directories
+- `mystery.json` for mystery data
+- `doc_<num>_<type>.json` for documents
+- `img_<num>_<description>.png` for images
 
----
+## Size Estimates
 
-**Next**: See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
+### Codebase
+- **Backend**: ~10,000 lines Python
+- **Contracts**: ~300 lines Solidity
+- **Tests**: ~2,000 lines
+- **Documentation**: ~20,000 words
 
+### Generated Mysteries
+- **Mystery JSON**: ~50-100 KB
+- **Documents**: ~5-10 KB each
+- **Images**: ~500 KB each
+- **Total per mystery**: ~5-10 MB
+
+## Next Steps
+
+- For backend development: See [backend/docs/README.md](../backend/docs/README.md)
+- For contract development: See [contracts/docs/README.md](../contracts/docs/README.md)
+- For system architecture: See [ARCHITECTURE.md](./ARCHITECTURE.md)
+- For integration: See [ARKIV_INTEGRATION.md](./ARKIV_INTEGRATION.md) and [SMART_CONTRACT.md](./SMART_CONTRACT.md)

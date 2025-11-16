@@ -143,8 +143,8 @@ contract InfiniteConspiracy is AccessControl, ReentrancyGuard {
         bytes32 mysteryId, 
         string calldata who,      // Conspirator name
         string calldata what,     // Operation name
-        string calldata where,    // Location
-        string calldata why       // Objective/outcome
+        string calldata why,      // Motivation
+        string calldata how       // Method/tactics
     ) 
         external 
         payable 
@@ -175,9 +175,9 @@ contract InfiniteConspiracy is AccessControl, ReentrancyGuard {
             "|",
             _toLower(what),
             "|",
-            _toLower(where),
+            _toLower(why),
             "|",
-            _toLower(why)
+            _toLower(how)
         ));
         if (hash == mystery.answerHash) {
             _solveMystery(mysteryId, msg.sender);

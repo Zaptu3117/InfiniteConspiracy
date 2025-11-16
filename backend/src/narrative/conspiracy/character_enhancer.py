@@ -178,7 +178,7 @@ Tensions: {', '.join(political_context.unresolved_tensions[:2])}
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 1500)
+                max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
             )
             
             # Update character

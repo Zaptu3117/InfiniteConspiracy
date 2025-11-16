@@ -131,6 +131,100 @@ class DocumentSubGraphMapper:
         
         return assignments
     
+    def apply_answer_containment(
+        self,
+        assignments: List[DocumentAssignment],
+        subgraphs: List[SubGraph],
+        answer_template,
+        max_who_docs: int = 3,
+        max_what_docs: int = 1
+    ) -> List[DocumentAssignment]:
+        """
+        ENFORCE answer containment by marking which documents can contain answers.
+        
+        This is algorithmic enforcement - we don't trust LLM prompts alone.
+        
+        Strategy:
+        - Find documents with identity evidence (potential WHO name)
+        - Mark only 2-3 as "can_contain_who_answer"
+        - Others marked "must_use_generic_references"
+        - Find documents with crypto evidence for WHAT
+        - Mark only 1 as "can_contain_what_answer"
+        
+        Args:
+            assignments: Document assignments
+            subgraphs: Sub-graphs
+            answer_template: Answer template
+            max_who_docs: Max documents that can contain WHO name
+            max_what_docs: Max documents that can contain WHAT codename
+        
+        Returns:
+            Updated assignments with containment flags
+        """
+        import random
+        
+        logger.info("   🔒 Applying answer containment...")
+        logger.info(f"      WHO answer can appear in max {max_who_docs} docs")
+        logger.info(f"      WHAT answer can appear in max {max_what_docs} doc(s)")
+        
+        # Find all nodes that belong to primary conspirator identity chains
+        primary_identity_subgraphs = [
+            sg for sg in subgraphs 
+            if sg.subgraph_type.value == "identity" and not sg.is_red_herring
+        ][:2]  # First 2 identity chains go to primary conspirator
+        
+        primary_node_ids = set()
+        for sg in primary_identity_subgraphs:
+            primary_node_ids.update(node.node_id for node in sg.evidence_nodes)
+        
+        # Find documents containing primary conspirator identity evidence
+        identity_docs = [
+            doc for doc in assignments
+            if any(node_id in primary_node_ids for node_id in doc.evidence_node_ids)
+        ]
+        
+        # Select only N documents to contain WHO answer
+        if len(identity_docs) > max_who_docs:
+            who_answer_docs = random.sample(identity_docs, max_who_docs)
+        else:
+            who_answer_docs = identity_docs
+        
+        who_doc_ids = {doc.document_id for doc in who_answer_docs}
+        
+        # Find crypto documents for WHAT
+        what_subgraphs = [
+            sg for sg in subgraphs
+            if sg.subgraph_type.value == "cryptographic" 
+            and sg.contributes_to and sg.contributes_to.value == "what"
+        ]
+        
+        what_node_ids = set()
+        for sg in what_subgraphs:
+            what_node_ids.update(node.node_id for node in sg.evidence_nodes)
+        
+        crypto_what_docs = [
+            doc for doc in assignments
+            if any(node_id in what_node_ids for node_id in doc.evidence_node_ids)
+        ]
+        
+        # Select only 1 document to contain full WHAT codename
+        if crypto_what_docs:
+            what_answer_doc = random.choice(crypto_what_docs)
+            what_doc_id = what_answer_doc.document_id
+        else:
+            what_doc_id = None
+        
+        # Apply flags to all assignments
+        for doc in assignments:
+            doc.can_contain_who_answer = doc.document_id in who_doc_ids
+            doc.can_contain_what_answer = doc.document_id == what_doc_id
+        
+        logger.info(f"      ✅ WHO name allowed in: {len(who_doc_ids)} docs")
+        logger.info(f"      ✅ WHAT codename allowed in: {1 if what_doc_id else 0} doc")
+        logger.info("")
+        
+        return assignments
+    
     def _assign_identity_nodes(
         self,
         nodes: List[EvidenceNode],

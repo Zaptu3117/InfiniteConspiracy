@@ -95,8 +95,16 @@ class SubGraphGenerator:
             subgraphs.append(sg)
         
         # Generate cryptographic sub-graphs (contribute to WHAT/HOW)
+        # IMPORTANT: Guarantee at least one chain for WHAT and one for HOW
+        crypto_assignments = [AnswerDimension.WHAT, AnswerDimension.HOW]
+        
         for i in range(num_crypto):
-            contributes_to = random.choice([AnswerDimension.WHAT, AnswerDimension.HOW])
+            # First chain → WHAT, second chain → HOW, rest are random
+            if i < len(crypto_assignments):
+                contributes_to = crypto_assignments[i]
+            else:
+                contributes_to = random.choice([AnswerDimension.WHAT, AnswerDimension.HOW])
+            
             sg = self._generate_crypto_subgraph(
                 f"crypto_{i}",
                 premise,
@@ -105,6 +113,7 @@ class SubGraphGenerator:
                 contributes_to
             )
             subgraphs.append(sg)
+            logger.info(f"      crypto_{i} → {contributes_to.value.upper()}")
         
         # Generate red herring sub-graphs
         for i in range(num_red_herrings):

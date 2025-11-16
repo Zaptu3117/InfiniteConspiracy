@@ -10,6 +10,7 @@ from models.conspiracy import ConspiracyMystery
 from .political_context_generator import PoliticalContextGenerator
 from .conspiracy_generator import ConspiracyGenerator
 from .answer_template_generator import AnswerTemplateGenerator
+from .question_generator import QuestionGenerator
 from .document_name_generator import DocumentNameGenerator
 from .subgraph_generator import SubGraphGenerator
 from .nodes import (
@@ -46,7 +47,7 @@ class ConspiracyPipeline:
         # Initialize components
         self.political_gen = PoliticalContextGenerator(llm_client)
         self.conspiracy_gen = ConspiracyGenerator(llm_client)
-        self.answer_template_gen = AnswerTemplateGenerator()
+        self.answer_template_gen = AnswerTemplateGenerator(llm_client)  # Now uses LLM for semantic extraction
         self.doc_name_gen = DocumentNameGenerator()
         self.subgraph_gen = SubGraphGenerator()
         
@@ -112,16 +113,27 @@ class ConspiracyPipeline:
             config=self.config.get("conspiracy", {})
         )
         
-        # PHASE 3: Answer Template Extraction (NEW)
+        # PHASE 3: Answer Template Extraction
         logger.info("="*60)
         logger.info("PHASE 3: ANSWER TEMPLATE EXTRACTION")
         logger.info("="*60)
-        answer_template = self.answer_template_gen.extract_from_premise(premise)
+        answer_template = await self.answer_template_gen.extract_from_premise(premise)
         logger.info(f"   WHO: {answer_template.who}")
         logger.info(f"   WHAT: {answer_template.what}")
-        logger.info(f"   WHERE: {answer_template.where}")
         logger.info(f"   WHY: {answer_template.why}")
+        logger.info(f"   HOW: {answer_template.how}")
         logger.info(f"   Hash: {answer_template.combined_hash[:16]}...")
+        
+        # PHASE 3.5: Question Generation
+        logger.info("="*60)
+        logger.info("PHASE 3.5: QUESTION GENERATION")
+        logger.info("="*60)
+        question_gen = QuestionGenerator(self.llm)
+        questions = await question_gen.generate_questions(premise, answer_template)
+        logger.info(f"   WHO Question: {questions['who']}")
+        logger.info(f"   WHAT Question: {questions['what']}")
+        logger.info(f"   WHY Question: {questions['why']}")
+        logger.info(f"   HOW Question: {questions['how']}")
         
         # PHASE 4: Sub-Graph Generation (renumbered)
         logger.info("="*60)
@@ -134,17 +146,17 @@ class ConspiracyPipeline:
             num_documents=num_documents
         )
         
-        # PHASE 4: Evidence Node Population
+        # PHASE 4: Character Generation (must come before evidence nodes)
         logger.info("="*60)
-        logger.info("PHASE 4: EVIDENCE NODE GENERATION")
+        logger.info("PHASE 4: CHARACTER GENERATION")
         logger.info("="*60)
-        await self._populate_evidence_nodes(subgraphs, premise, political_context, difficulty)
+        characters = await self._generate_characters(premise, political_context, answer_template, difficulty)
         
-        # PHASE 5: Character Generation (will be enhanced later)
+        # PHASE 5: Evidence Node Population (uses characters for distribution)
         logger.info("="*60)
-        logger.info("PHASE 5: CHARACTER GENERATION")
+        logger.info("PHASE 5: EVIDENCE NODE GENERATION")
         logger.info("="*60)
-        characters = await self._generate_characters(premise, political_context, difficulty)
+        await self._populate_evidence_nodes(subgraphs, premise, political_context, difficulty, answer_template, characters)
         
         # PHASE 6: Crypto Key Enhancement
         logger.info("="*60)
@@ -166,6 +178,18 @@ class ConspiracyPipeline:
             subgraphs,
             num_documents,
             self.config.get("document_mapping", {})
+        )
+        
+        # PHASE 7.5: Answer Containment (algorithmic enforcement)
+        logger.info("="*60)
+        logger.info("PHASE 7.5: ANSWER CONTAINMENT")
+        logger.info("="*60)
+        assignments = self.doc_mapper.apply_answer_containment(
+            assignments,
+            subgraphs,
+            answer_template,
+            max_who_docs=3,
+            max_what_docs=1
         )
         
         # PHASE 8: Document Generation
@@ -236,6 +260,7 @@ class ConspiracyPipeline:
             political_context,
             premise,
             answer_template,
+            questions,
             subgraphs,
             crypto_keys,
             assignments,
@@ -276,14 +301,25 @@ class ConspiracyPipeline:
         subgraphs,
         premise,
         political_context,
-        difficulty
+        difficulty,
+        answer_template,
+        characters
     ):
-        """Populate evidence nodes for all sub-graphs."""
+        """Populate evidence nodes for all sub-graphs using discoverable answer values."""
         
         logger.info("   Populating evidence nodes...")
+        logger.info(f"   ⚠️  Using answer template values in evidence:")
+        logger.info(f"      WHO: {answer_template.who}")
+        logger.info(f"      WHAT: {answer_template.what}")
+        logger.info(f"      WHY: {answer_template.why}")
+        logger.info(f"      HOW: {answer_template.how}")
+        logger.info(f"   📋 Distributing identity chains across {len(characters)} characters")
         
         # Get architectures (simplified - would normally use from subgraph_types)
         from .subgraph_types import get_architecture_for_type
+        
+        # Track identity chain index for distribution
+        identity_chain_index = 0
         
         for sg in subgraphs:
             if sg.is_red_herring:
@@ -292,16 +328,22 @@ class ConspiracyPipeline:
             architecture = get_architecture_for_type(sg.subgraph_type.value, difficulty)
             
             if sg.subgraph_type.value == "identity":
-                # Get target name from premise WHO
-                target_name = premise.who.split()[0] if premise.who else "Agent"
+                # ✅ Distribute identity chains across different characters
+                target_character = self._select_target_for_identity_chain(
+                    characters,
+                    identity_chain_index,
+                    answer_template
+                )
+                logger.info(f"   🔍 Identity chain {identity_chain_index} → {target_character['name']} ({target_character['involvement_level']})")
                 evidence_nodes, inference_nodes = self.identity_gen.generate_identity_chain(
                     sg.subgraph_id,
-                    target_name,
+                    target_character,
                     difficulty,
                     architecture
                 )
                 sg.evidence_nodes = evidence_nodes
                 sg.inference_nodes = inference_nodes
+                identity_chain_index += 1
             
             elif sg.subgraph_type.value == "psychological":
                 evidence_nodes, inference_nodes = await self.psychological_gen.generate_psychological_chain(
@@ -309,6 +351,7 @@ class ConspiracyPipeline:
                     premise,
                     political_context,
                     architecture,
+                    answer_template,
                     self.config.get("psychological", {})
                 )
                 sg.evidence_nodes = evidence_nodes
@@ -321,6 +364,7 @@ class ConspiracyPipeline:
                     [],  # Characters not yet generated
                     architecture,
                     sg.contributes_to,
+                    answer_template,
                     self.config.get("cryptographic", {})
                 )
                 sg.evidence_nodes = evidence_nodes
@@ -332,26 +376,271 @@ class ConspiracyPipeline:
         
         logger.info(f"   ✅ Populated {len(subgraphs)} sub-graphs")
     
-    async def _generate_characters(self, premise, political_context, difficulty):
-        """Generate initial characters."""
+    async def _generate_characters(self, premise, political_context, answer_template, difficulty):
+        """
+        Generate 10-15 diverse characters.
+        
+        Strategy:
+        - 1 primary conspirator (THE answer to WHO)
+        - 3-4 secondary conspirators (involved but not the leader)
+        - 5-8 innocent characters (witnesses, colleagues, red herrings)
+        
+        Args:
+            premise: Conspiracy premise
+            political_context: Political context
+            answer_template: Answer template with WHO answer
+            difficulty: Difficulty level
+        
+        Returns:
+            List of character dictionaries
+        """
         import random
         
-        # Extract conspirator names from premise
-        names = premise.who.split(",")[:4]  # Up to 4 conspirators
+        characters = []
+        
+        # 1. PRIMARY CONSPIRATOR (THE answer)
+        primary_name = answer_template.who
+        primary_char = {
+            "name": primary_name,
+            "is_primary": True,
+            "involvement_level": "leader",
+            "clearance_level": "top_secret",
+            "role": "Chief Orchestrator",
+            "background": f"Mastermind behind {premise.conspiracy_name}. Commands the operation.",
+            "personality": random.choice(["calculating", "charismatic", "ruthless", "visionary"])
+        }
+        characters.append(primary_char)
+        logger.info(f"      Primary conspirator: {primary_name}")
+        
+        # 2. SECONDARY CONSPIRATORS (3-4)
+        num_secondary = random.randint(3, 4)
+        secondary_conspirators = await self._generate_secondary_conspirators(
+            premise, 
+            political_context, 
+            num_secondary
+        )
+        characters.extend(secondary_conspirators)
+        logger.info(f"      Secondary conspirators: {len(secondary_conspirators)}")
+        
+        # 3. INNOCENT CHARACTERS (5-8)
+        num_innocents = random.randint(5, 8)
+        innocent_characters = await self._generate_innocent_characters(
+            political_context,
+            num_innocents
+        )
+        characters.extend(innocent_characters)
+        logger.info(f"      Innocent characters: {len(innocent_characters)}")
+        
+        logger.info(f"   Generated {len(characters)} total characters (1 primary, {len(secondary_conspirators)} secondary, {len(innocent_characters)} innocent)")
+        return characters
+    
+    async def _generate_secondary_conspirators(
+        self, 
+        premise, 
+        political_context, 
+        num_characters
+    ):
+        """Generate secondary conspirator characters using LLM."""
+        
+        prompt = f"""Generate {num_characters} secondary conspirator characters for a conspiracy mystery.
+
+CONSPIRACY CONTEXT:
+- Operation: {premise.conspiracy_name}
+- Goal: {premise.what[:200]}...
+- World: {political_context.world_name}
+
+REQUIREMENTS:
+- These are SECONDARY conspirators (members, not leaders)
+- Each should have a distinct role and personality
+- Names should be diverse and realistic
+- Roles: Operative, Specialist, Handler, Coordinator, Agent, Technician, etc.
+
+Generate {num_characters} characters.
+
+OUTPUT FORMAT (JSON array):
+[
+  {{
+    "name": "Full name (e.g., 'Marcus Chen', 'Elena Volkov')",
+    "role": "Specific role in conspiracy",
+    "background": "Brief background (1-2 sentences)",
+    "personality": "One-word personality trait"
+  }}
+]"""
+        
+        try:
+            response = await self.llm.generate_json(
+                prompt,
+                temperature=0.8,
+                max_tokens=1000
+            )
+            
+            if isinstance(response, list):
+                characters_data = response
+            else:
+                characters_data = response.get("characters", [])
+            
+            characters = []
+            for data in characters_data[:num_characters]:
+                char = {
+                    "name": data.get("name", f"Agent {len(characters)}"),
+                    "is_primary": False,
+                    "involvement_level": "conspirator",
+                    "clearance_level": "secret",
+                    "role": data.get("role", "Operative"),
+                    "background": data.get("background", "Member of the conspiracy."),
+                    "personality": data.get("personality", "loyal")
+                }
+                characters.append(char)
+            
+            return characters
+            
+        except Exception as e:
+            logger.error(f"   ❌ Secondary conspirator generation failed: {e}, using fallback")
+            return self._generate_fallback_conspirators(num_characters)
+    
+    async def _generate_innocent_characters(
+        self,
+        political_context,
+        num_characters
+    ):
+        """Generate innocent/witness characters using LLM."""
+        
+        prompt = f"""Generate {num_characters} innocent characters for a conspiracy mystery.
+
+WORLD CONTEXT:
+- World: {political_context.world_name}
+- Setting: {political_context.public_narrative[:200]}...
+
+REQUIREMENTS:
+- These are INNOCENT people (not conspirators)
+- Roles: Witness, Colleague, Technician, Administrator, Security Guard, Analyst, Journalist, etc.
+- Some may have seen suspicious activity but are not involved
+- Names should be diverse and realistic
+- They create red herrings and add complexity
+
+Generate {num_characters} innocent characters.
+
+OUTPUT FORMAT (JSON array):
+[
+  {{
+    "name": "Full name",
+    "role": "Job/position (not conspirator)",
+    "background": "Brief background (1-2 sentences)",
+    "personality": "One-word personality trait"
+  }}
+]"""
+        
+        try:
+            response = await self.llm.generate_json(
+                prompt,
+                temperature=0.8,
+                max_tokens=1000
+            )
+            
+            if isinstance(response, list):
+                characters_data = response
+            else:
+                characters_data = response.get("characters", [])
+            
+            characters = []
+            for data in characters_data[:num_characters]:
+                char = {
+                    "name": data.get("name", f"Person {len(characters)}"),
+                    "is_primary": False,
+                    "involvement_level": "innocent",
+                    "clearance_level": "unclassified",
+                    "role": data.get("role", "Witness"),
+                    "background": data.get("background", "Innocent bystander."),
+                    "personality": data.get("personality", "observant")
+                }
+                characters.append(char)
+            
+            return characters
+            
+        except Exception as e:
+            logger.error(f"   ❌ Innocent character generation failed: {e}, using fallback")
+            return self._generate_fallback_innocents(num_characters)
+    
+    def _generate_fallback_conspirators(self, num_characters):
+        """Fallback secondary conspirators if LLM fails."""
+        import random
+        
+        names = ["Marcus Chen", "Elena Volkov", "James Torres", "Sophia Rahman"]
+        roles = ["Operative", "Specialist", "Handler", "Coordinator"]
         
         characters = []
-        for name in names:
-            name = name.strip()
+        for i in range(num_characters):
             char = {
-                "name": name,
-                "role": random.choice(["Agent", "Director", "Operative", "Analyst"]),
-                "background": f"Member of the conspiracy. Connected to {political_context.world_name}.",
-                "personality": random.choice(["calculating", "paranoid", "idealistic", "ruthless"])
+                "name": names[i % len(names)],
+                "is_primary": False,
+                "involvement_level": "conspirator",
+                "clearance_level": "secret",
+                "role": roles[i % len(roles)],
+                "background": "Member of the conspiracy.",
+                "personality": random.choice(["loyal", "cautious", "ambitious"])
             }
             characters.append(char)
         
-        logger.info(f"   Generated {len(characters)} characters")
         return characters
+    
+    def _generate_fallback_innocents(self, num_characters):
+        """Fallback innocent characters if LLM fails."""
+        import random
+        
+        names = ["Sarah Mitchell", "David Park", "Rachel Cohen", "Ahmed Hassan", "Lisa Wong", "Tom Anderson"]
+        roles = ["Analyst", "Technician", "Administrator", "Security", "Journalist", "Witness"]
+        
+        characters = []
+        for i in range(num_characters):
+            char = {
+                "name": names[i % len(names)],
+                "is_primary": False,
+                "involvement_level": "innocent",
+                "clearance_level": "unclassified",
+                "role": roles[i % len(roles)],
+                "background": "Innocent bystander.",
+                "personality": random.choice(["observant", "nervous", "professional"])
+            }
+            characters.append(char)
+        
+        return characters
+    
+    def _select_target_for_identity_chain(self, characters, chain_index, answer_template):
+        """
+        Distribute identity chains across characters strategically.
+        
+        Strategy:
+        - Chains 0-1: Primary conspirator (THE answer)
+        - Chains 2-3: Secondary conspirators  
+        - Chains 4+: Innocent characters (red herrings)
+        
+        This ensures the WHO answer name appears in only 2 chains (fewer documents),
+        while other characters create complexity and require inference.
+        
+        Args:
+            characters: List of character dicts
+            chain_index: Current chain index
+            answer_template: Answer template with WHO answer
+        
+        Returns:
+            Character dict for this chain
+        """
+        import random
+        
+        # Separate characters by involvement level
+        primary = [c for c in characters if c.get("is_primary")]
+        secondary = [c for c in characters if c.get("involvement_level") == "conspirator"]
+        innocent = [c for c in characters if c.get("involvement_level") == "innocent"]
+        
+        if chain_index < 2:
+            # First 2 chains → Primary conspirator (the answer)
+            return primary[0] if primary else characters[0]
+        elif chain_index < 4:
+            # Chains 2-3 → Secondary conspirators
+            return random.choice(secondary) if secondary else characters[chain_index % len(characters)]
+        else:
+            # Chains 4+ → Innocent characters (red herrings)
+            return random.choice(innocent) if innocent else characters[chain_index % len(characters)]
     
     def _collect_crypto_keys(self, subgraphs):
         """Collect all crypto keys from sub-graphs."""
@@ -406,6 +695,7 @@ class ConspiracyPipeline:
         political_context,
         premise,
         answer_template,
+        questions,
         subgraphs,
         crypto_keys,
         assignments,
@@ -425,6 +715,7 @@ class ConspiracyPipeline:
             political_context=political_context,
             premise=premise,
             answer_template=answer_template,
+            questions=questions,
             subgraphs=subgraphs,
             crypto_keys=crypto_keys,
             document_assignments=assignments,
@@ -520,8 +811,8 @@ class ConspiracyPipeline:
                 f.write(f"## Answer Template (Smart Contract Submission)\n\n")
                 f.write(f"**WHO:** {mystery.answer_template.who}\n\n")
                 f.write(f"**WHAT:** {mystery.answer_template.what}\n\n")
-                f.write(f"**WHERE:** {mystery.answer_template.where}\n\n")
                 f.write(f"**WHY:** {mystery.answer_template.why}\n\n")
+                f.write(f"**HOW:** {mystery.answer_template.how}\n\n")
                 f.write(f"**Combined Hash:** `{mystery.answer_template.combined_hash}`\n\n")
             
             f.write(f"## The Conspiracy (Full Details)\n\n")

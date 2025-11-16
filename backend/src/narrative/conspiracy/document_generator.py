@@ -61,6 +61,18 @@ CRITICAL CONSTRAINTS:
    - Diaries: personal reflections, detailed thoughts, 2-3 paragraphs
    - The evidence should be HIDDEN in the details, not obvious
 
+⚠️ CRITICAL: NAME & OPERATION CONTAINMENT ⚠️
+- ONLY include character names if they appear in the evidence list above
+- ONLY include the operation codename if it appears in the evidence list above
+- If no specific name is required, use:
+  * Roles/titles: "the operative", "the analyst", "the director"
+  * Generic references: "a team member", "personnel", "the individual"
+  * System IDs: "user #5134", "employee badge 4421"
+- If no operation name is required, use:
+  * Generic: "the operation", "the mission", "the project"
+  * Partial: "the convergence protocol", "phase activation"
+- DO NOT invent or add names/codenames not in the evidence list!
+
 {doc_type_specific_instructions}
 
 OUTPUT FORMAT - USE EXACTLY THESE FIELDS:
@@ -412,11 +424,13 @@ class ConstrainedDocumentGenerator:
             raise Exception(f"No evidence nodes assigned to document {assignment.document_id} - cannot generate")
         
         # Build evidence list with EXTRACTED KEY VALUES + LINKING CONTEXT
+        # ENFORCES answer containment based on assignment flags
         evidence_list = self._format_evidence_for_prompt(
             evidence_nodes, 
             assignment.document_type,
             assignment.subgraph_ids,
-            node_lookup
+            node_lookup,
+            assignment  # Pass assignment for containment enforcement
         )
         
         # Get author (character or system)
@@ -452,7 +466,7 @@ class ConstrainedDocumentGenerator:
                 response = await self.llm.generate_json(
                     prompt,
                     temperature=config.get("temperature", 0.7),
-                    max_tokens=config.get("max_tokens", 2000)
+                    max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
                 )
                 
                 # LOG THE RESPONSE
@@ -494,10 +508,13 @@ class ConstrainedDocumentGenerator:
         evidence_nodes: List[EvidenceNode], 
         doc_type: str = "document",
         subgraph_ids: List[str] = None,
-        node_lookup: Dict[str, EvidenceNode] = None
+        node_lookup: Dict[str, EvidenceNode] = None,
+        assignment: DocumentAssignment = None
     ) -> str:
         """
         Extract and format key values from evidence for prompt.
+        
+        ENFORCES answer containment based on assignment flags.
         
         CRITICAL: For identity chains, include LINKING IDENTIFIERS so documents
         can be cross-referenced. Each document should contain at least 2 identifiers.
@@ -505,6 +522,10 @@ class ConstrainedDocumentGenerator:
         import re
         
         formatted_lines = []
+        
+        # Check containment flags
+        can_use_who_name = assignment.can_contain_who_answer if assignment else True
+        can_use_what_codename = assignment.can_contain_what_answer if assignment else True
         
         # For identity chains, get the "name" identifier as common linking field
         common_name = None
@@ -523,8 +544,13 @@ class ConstrainedDocumentGenerator:
             
             if node.evidence_type.value == "identity":
                 # Use the actual identifier from the node
+                # BUT skip "name" identifier if containment is active
                 if hasattr(node, 'identifier_type') and hasattr(node, 'identifier_value'):
-                    key_values.append(f"{node.identifier_type}: {node.identifier_value}")
+                    if node.identifier_type == "name" and not can_use_who_name:
+                        # Skip the name identifier - containment active
+                        pass
+                    else:
+                        key_values.append(f"{node.identifier_type}: {node.identifier_value}")
                 
                 # Also extract from content as fallback
                 ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', node.content)
@@ -553,13 +579,38 @@ class ConstrainedDocumentGenerator:
                     formatted_lines.append(f"   → {val}")
         
         # Add common name as linking identifier for identity documents
+        # BUT only if this document is allowed to contain the WHO answer
         if common_name and any(n.evidence_type.value == "identity" for n in evidence_nodes):
+            if can_use_who_name:
+                # This document CAN contain the full name
+                formatted_lines.append(f"\n{'='*60}")
+                formatted_lines.append(f"🔗 LINKING IDENTIFIER:")
+                formatted_lines.append(f"{'='*60}")
+                formatted_lines.append(f"\n⚠️  MANDATORY: Include this identifier for cross-referencing:")
+                formatted_lines.append(f"   → name: {common_name}")
+                formatted_lines.append(f"\nThis allows linking with other documents in this chain.")
+            else:
+                # This document CANNOT contain the full name - use generic reference
+                formatted_lines.append(f"\n{'='*60}")
+                formatted_lines.append(f"⚠️  NAME CONTAINMENT RESTRICTION:")
+                formatted_lines.append(f"{'='*60}")
+                formatted_lines.append(f"\n❌ DO NOT include the person's full name in this document")
+                formatted_lines.append(f"✅ Instead use:")
+                formatted_lines.append(f"   - System identifiers (user ID, badge number, IP address)")
+                formatted_lines.append(f"   - Roles/titles: 'the operative', 'the analyst', 'personnel'")
+                formatted_lines.append(f"   - Generic: 'a team member', 'the individual', 'employee #XXXX'")
+                formatted_lines.append(f"\nThe full name is classified and appears in other documents only.")
+        
+        # Add note about operation codename if restricted
+        if not can_use_what_codename and any(n.evidence_type.value == "cryptographic" for n in evidence_nodes):
             formatted_lines.append(f"\n{'='*60}")
-            formatted_lines.append(f"🔗 LINKING IDENTIFIER:")
+            formatted_lines.append(f"⚠️  OPERATION NAME RESTRICTION:")
             formatted_lines.append(f"{'='*60}")
-            formatted_lines.append(f"\n⚠️  MANDATORY: Also include this identifier for cross-referencing:")
-            formatted_lines.append(f"   → name: {common_name}")
-            formatted_lines.append(f"\nThis allows linking with other documents in this chain.")
+            formatted_lines.append(f"\n❌ DO NOT use the full operation codename")
+            formatted_lines.append(f"✅ Instead use:")
+            formatted_lines.append(f"   - Generic: 'the operation', 'the mission', 'the project'")
+            formatted_lines.append(f"   - Partial: 'the convergence protocol', 'phase activation'")
+            formatted_lines.append(f"   - Code phrases: 'the task', 'our work'")
         
         return "\n".join(formatted_lines)
     

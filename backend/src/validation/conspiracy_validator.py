@@ -268,7 +268,7 @@ Answer all four questions based on the documents.
             return False
     
     def _check_answer_coverage(self, mystery: ConspiracyMystery) -> Dict[str, bool]:
-        """Check if all answer dimensions have evidence."""
+        """Check if all answer dimensions are actually discoverable in documents."""
         
         coverage = {
             "WHO": False,
@@ -277,15 +277,36 @@ Answer all four questions based on the documents.
             "HOW": False
         }
         
-        # Check sub-graphs
-        for sg in mystery.subgraphs:
-            if sg.is_complete and not sg.is_red_herring:
-                if sg.contributes_to:
-                    coverage[sg.contributes_to.value.upper()] = True
+        # Get answer values
+        if not mystery.answer_template:
+            logger.warning("   ⚠️  No answer template found")
+            return coverage
         
-        for dim, has_evidence in coverage.items():
-            status = "✅" if has_evidence else "❌"
-            logger.info(f"   {status} {dim}: {'Evidence exists' if has_evidence else 'Missing evidence'}")
+        who_answer = mystery.answer_template.who.lower()
+        what_answer = mystery.answer_template.what.lower()
+        why_answer = mystery.answer_template.why.lower()
+        how_answer = mystery.answer_template.how.lower()
+        
+        # Search documents for actual answer strings
+        import json
+        for doc in mystery.documents:
+            doc_text = json.dumps(doc).lower()
+            
+            if who_answer in doc_text:
+                coverage["WHO"] = True
+            if what_answer in doc_text:
+                coverage["WHAT"] = True
+            if why_answer in doc_text:
+                coverage["WHY"] = True
+            if how_answer in doc_text:
+                coverage["HOW"] = True
+        
+        # Log results with actual answer values
+        for dim in ["WHO", "WHAT", "WHY", "HOW"]:
+            answer_val = getattr(mystery.answer_template, dim.lower())
+            found = coverage[dim]
+            status = "✅" if found else "❌"
+            logger.info(f"   {status} {dim}: '{answer_val}' {'FOUND' if found else 'NOT FOUND'} in documents")
         
         return coverage
     

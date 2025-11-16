@@ -8,7 +8,8 @@ from models.conspiracy import (
     EvidenceType,
     AnswerDimension,
     ConspiracyPremise,
-    PoliticalContext
+    PoliticalContext,
+    MysteryAnswer
 )
 
 
@@ -20,11 +21,39 @@ PSYCHOLOGICAL_EVIDENCE_PROMPT = """You are creating psychological/behavioral evi
 CONSPIRACY CONTEXT:
 {conspiracy_context}
 
+OPERATION NAME: {operation_name}
+
 POLITICAL CONTEXT:
 {political_context_summary}
 
+TARGET WHY PHRASE (MUST EMBED): "{why_phrase}"
+
 YOUR TASK:
 Generate {num_nodes} pieces of psychological evidence that reveal behavioral patterns, stress indicators, relationship dynamics, or motive clues.
+
+OPERATION NAME REFERENCES:
+- When characters mention the operation, use INDIRECT references:
+  * "the operation" / "the mission" / "our work" / "the project"
+  * "what we're doing" / "the plan" / "the task"
+  * Internal nicknames or partial names
+- AVOID using the full operation codename "{operation_name}" in psychological evidence
+- The operation name is classified; characters wouldn't casually mention it
+
+CRITICAL REQUIREMENT - EMBED THE WHY PHRASE:
+The exact phrase "{why_phrase}" MUST appear verbatim in AT LEAST 2 of the evidence pieces.
+
+Ways to naturally embed the phrase:
+1. Character quotes it in an email or communication
+2. Appears in a diary entry or personal reflection
+3. Witness reports hearing the character say it
+4. Found in an internal memo or manifesto
+5. Part of a ritual phrase or motto repeated by conspirators
+
+Examples:
+- Email: "Dr. X wrote: 'Remember, {why_phrase}. That is our mission.'"
+- Diary: "Today I committed to the cause. {why_phrase} - this drives everything."
+- Witness: "I overheard them saying '{why_phrase}' during the meeting."
+- Memo: "Subject: Mission Statement - {why_phrase}"
 
 TYPES OF PSYCHOLOGICAL EVIDENCE:
 1. Stress Indicators: Email tone changes, anxiety in communications, behavior shifts
@@ -38,12 +67,12 @@ IMPORTANT:
 - Spread evidence across different people/situations
 - Requires reading MULTIPLE pieces to see the pattern
 - Should feel like real human behavior, not contrived clues
-- Some should show stress, some show planning, some show relationships
+- AT LEAST 2 pieces MUST contain the exact phrase "{why_phrase}"
 
 Output JSON array with {num_nodes} evidence objects:
 [
   {{
-    "content": "Specific behavioral observation or pattern",
+    "content": "Specific behavioral observation or pattern (INCLUDE '{why_phrase}' in at least 2 pieces)",
     "psychological_indicator": "stress|paranoia|deception|manipulation|coercion|ideology",
     "importance": "key|supporting|minor",
     "doc_type": "email|diary|witness_statement|internal_memo|phone_record"
@@ -59,6 +88,8 @@ EVIDENCE COLLECTED:
 CONSPIRACY CONTEXT:
 {conspiracy_context}
 
+TARGET WHY PHRASE: "{why_phrase}"
+
 YOUR TASK:
 Generate {num_inferences} inference statements that connect the psychological evidence.
 
@@ -67,7 +98,10 @@ These inferences should:
 - Reveal relationships between conspirators
 - Suggest motives without stating them outright
 - Show progression of events/psychology
-- Lead toward the WHY answer: {why_answer}
+- Lead toward understanding why the phrase "{why_phrase}" is significant
+- Connect evidence that contains the WHY phrase to other behavioral patterns
+
+The goal is to help players understand that "{why_phrase}" represents the core motivation.
 
 Output JSON array:
 [
@@ -96,6 +130,7 @@ class PsychologicalNodeGenerator:
         premise: ConspiracyPremise,
         political_context: PoliticalContext,
         architecture: Any,
+        answer_template: MysteryAnswer,
         config: Dict[str, Any] = None
     ) -> tuple[List[EvidenceNode], List[InferenceNode]]:
         """
@@ -106,6 +141,7 @@ class PsychologicalNodeGenerator:
             premise: Conspiracy premise
             political_context: Political backdrop
             architecture: Sub-graph architecture
+            answer_template: Answer template with discoverable WHY phrase
             config: Optional configuration
         
         Returns:
@@ -119,12 +155,14 @@ class PsychologicalNodeGenerator:
         
         logger.info(f"   Generating psychological chain {subgraph_id}...")
         logger.info(f"      Evidence nodes: {num_evidence}, Inferences: {num_inference}")
+        logger.info(f"      Target WHY phrase: \"{answer_template.why}\"")
         
         # Generate evidence nodes
         evidence_nodes = await self._generate_evidence_nodes(
             subgraph_id,
             premise,
             political_context,
+            answer_template,
             num_evidence,
             config
         )
@@ -133,6 +171,7 @@ class PsychologicalNodeGenerator:
         inference_nodes = await self._generate_inference_nodes(
             subgraph_id,
             premise,
+            answer_template,
             evidence_nodes,
             num_inference,
             config
@@ -145,17 +184,18 @@ class PsychologicalNodeGenerator:
         subgraph_id: str,
         premise: ConspiracyPremise,
         political_context: PoliticalContext,
+        answer_template: MysteryAnswer,
         num_nodes: int,
         config: Dict[str, Any]
     ) -> List[EvidenceNode]:
-        """Generate psychological evidence nodes."""
+        """Generate psychological evidence nodes with embedded WHY phrase."""
         
         # Build context
         conspiracy_context = f"""
-WHO: {premise.who}
-WHAT: {premise.what}
-WHY: {premise.why}
-HOW: {premise.how}
+WHO: {premise.who[:300]}...
+WHAT: {premise.what[:300]}...
+WHY: {premise.why[:300]}...
+HOW: {premise.how[:200]}...
 """
         
         political_summary = f"""
@@ -164,10 +204,12 @@ Hidden Reality: {political_context.hidden_reality}
 Key Tensions: {', '.join(political_context.unresolved_tensions[:2])}
 """
         
-        # Build prompt
+        # Build prompt with WHY phrase to embed
         prompt = PSYCHOLOGICAL_EVIDENCE_PROMPT.format(
             conspiracy_context=conspiracy_context,
+            operation_name=answer_template.what,
             political_context_summary=political_summary,
+            why_phrase=answer_template.why,
             num_nodes=num_nodes
         )
         
@@ -176,7 +218,7 @@ Key Tensions: {', '.join(political_context.unresolved_tensions[:2])}
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 2000)
+                max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
             )
             
             # Parse response
@@ -211,11 +253,12 @@ Key Tensions: {', '.join(political_context.unresolved_tensions[:2])}
         self,
         subgraph_id: str,
         premise: ConspiracyPremise,
+        answer_template: MysteryAnswer,
         evidence_nodes: List[EvidenceNode],
         num_inferences: int,
         config: Dict[str, Any]
     ) -> List[InferenceNode]:
-        """Generate psychological inference nodes."""
+        """Generate psychological inference nodes that connect to WHY phrase."""
         
         # Summarize evidence
         evidence_summary = "\n".join([
@@ -224,8 +267,9 @@ Key Tensions: {', '.join(political_context.unresolved_tensions[:2])}
         ])
         
         conspiracy_context = f"""
-WHY (the motivation): {premise.why}
-WHO (the conspirators): {premise.who}
+WHY PHRASE: {answer_template.why}
+WHO (Primary): {answer_template.who}
+WHAT (Operation): {answer_template.what}
 """
         
         # Build prompt
@@ -233,7 +277,7 @@ WHO (the conspirators): {premise.who}
             evidence_summary=evidence_summary,
             conspiracy_context=conspiracy_context,
             num_inferences=num_inferences,
-            why_answer=premise.why
+            why_phrase=answer_template.why
         )
         
         try:
@@ -241,7 +285,7 @@ WHO (the conspirators): {premise.who}
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.6),
-                max_tokens=config.get("max_tokens", 1500)
+                max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
             )
             
             # Parse response

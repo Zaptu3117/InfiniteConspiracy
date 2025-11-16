@@ -427,7 +427,6 @@ main().catch(console.error);
 ```
 
 ### Deploy Command
-
 ```bash
 cd contracts
 npx hardhat run scripts/deploy.js --network kusama
@@ -436,7 +435,6 @@ npx hardhat run scripts/deploy.js --network kusama
 ## Integration Examples
 
 ### Frontend (ethers.js)
-
 ```javascript
 import { ethers } from 'ethers';
 

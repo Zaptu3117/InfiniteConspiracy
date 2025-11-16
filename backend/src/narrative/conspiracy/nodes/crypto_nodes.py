@@ -9,7 +9,8 @@ from models.conspiracy import (
     CryptoKey,
     EvidenceType,
     AnswerDimension,
-    ConspiracyPremise
+    ConspiracyPremise,
+    MysteryAnswer
 )
 
 
@@ -73,23 +74,23 @@ CONSPIRACY CONTEXT:
 CRYPTO KEY:
 {key_info}
 
+TARGET PHRASE TO EMBED: "{target_phrase}"
+PHRASE TYPE: {phrase_type}
+
 YOUR TASK:
 Generate {num_phrases} phrases/sentences that should be encrypted in documents.
 
+CRITICAL REQUIREMENTS:
+
+{embedding_strategy}
+
 IMPORTANT:
 - Phrases should contain KEY INFORMATION about the conspiracy
-- Should reveal aspects of WHAT (goal) or HOW (method)
-- Keep phrases 3-10 words long
-- Should feel like secret communications or hidden notes
+- Keep phrases 5-12 words long
+- Should feel like secret communications or operational orders
 - Make them meaningful to the conspiracy
 
-Examples:
-- "The ritual begins at midnight on the solstice"
-- "Agent Torres has infiltrated the Directorate"
-- "The artifact is hidden in Vault Seven"
-- "Phase three activates when all seals break"
-
-Output JSON array:
+Output JSON array with {num_phrases} phrase objects:
 [
   {{
     "plaintext": "The actual message",
@@ -118,6 +119,7 @@ class CryptoNodeGenerator:
         characters: List[Dict[str, Any]],
         architecture: Any,
         contributes_to: AnswerDimension,
+        answer_template: MysteryAnswer,
         config: Dict[str, Any] = None
     ) -> tuple[List[EvidenceNode], List[InferenceNode], List[CryptoKey]]:
         """
@@ -129,6 +131,7 @@ class CryptoNodeGenerator:
             characters: Character list
             architecture: Sub-graph architecture
             contributes_to: Which answer dimension (WHAT/HOW)
+            answer_template: Answer template with discoverable WHAT/HOW phrases
             config: Optional configuration
         
         Returns:
@@ -136,7 +139,11 @@ class CryptoNodeGenerator:
         """
         config = config or {}
         
+        # Log target phrase based on contribution
+        target_phrase = answer_template.what if contributes_to == AnswerDimension.WHAT else answer_template.how
         logger.info(f"   Generating crypto chain {subgraph_id}...")
+        logger.info(f"      Contributes to: {contributes_to.value}")
+        logger.info(f"      Target phrase: \"{target_phrase}\"")
         
         # Determine number of encrypted phrases needed
         num_phrases = random.randint(2, 3)  # 2-3 encrypted phrases per chain
@@ -160,6 +167,7 @@ class CryptoNodeGenerator:
             crypto_keys,  # Pass all keys, not just first one
             num_phrases,
             contributes_to,
+            answer_template,
             config
         )
         
@@ -212,7 +220,7 @@ Method: {premise.how}
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 1500)
+                max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
             )
             
             # Parse response
@@ -250,30 +258,65 @@ Method: {premise.how}
         crypto_keys: List[CryptoKey],
         num_phrases: int,
         contributes_to: AnswerDimension,
+        answer_template: MysteryAnswer,
         config: Dict[str, Any]
     ) -> List[EvidenceNode]:
-        """Generate phrases that will be encrypted."""
+        """Generate phrases that will be encrypted, embedding target answer phrase."""
         
         if not crypto_keys:
             return []
         
-        # Focus on WHAT or HOW based on contribution
+        # Get target phrase based on contribution
         if contributes_to == AnswerDimension.WHAT:
-            focus = f"Goal: {premise.what}"
+            target_phrase = answer_template.what
+            focus = f"Operation: {answer_template.what}"
         else:
-            focus = f"Method: {premise.how}"
+            target_phrase = answer_template.how
+            focus = f"Method: {answer_template.how}"
         
         conspiracy_context = f"""
 Conspiracy: {premise.conspiracy_name}
 {focus}
+Context: {premise.what[:200] if contributes_to == AnswerDimension.WHAT else premise.how[:200]}...
 """
         
         key_info = f"Key reference: {crypto_keys[0].inference_description}"
         
-        # Build prompt
+        # Determine phrase type and embedding strategy
+        if contributes_to == AnswerDimension.WHAT:
+            phrase_type = "OPERATION CODENAME"
+            embedding_strategy = f"""OPERATION CODENAME CONTAINMENT:
+- ONLY 1 message should contain the FULL codename "{target_phrase}"
+- Other messages should use PARTIAL references:
+  * "the {target_phrase.split()[0]} operation"
+  * "the {target_phrase.split()[-1]} protocol"
+  * "the operation" / "the mission" / "the project"
+  * Internal codenames or nicknames
+- This makes the full codename rare and valuable
+
+EXAMPLE (if codename is "Eclipse Veil"):
+- Message 1 (FULL): "Operation Eclipse Veil begins at midnight"
+- Message 2 (PARTIAL): "The Eclipse protocol activated"
+- Message 3 (GENERIC): "The operation proceeds as planned"
+"""
+        else:  # HOW
+            phrase_type = "METHOD/TACTIC"
+            embedding_strategy = f"""METHOD EMBEDDING:
+- AT LEAST 1 message MUST contain "{target_phrase}" verbatim
+- This describes the primary method/tactic
+- Embed it naturally in operational orders or technical instructions
+- Can be repeated if it's a key tactical phrase
+
+EXAMPLE: "Phase 1: {target_phrase} to establish access"
+"""
+        
+        # Build prompt with target phrase and strategy
         prompt = CRYPTO_EVIDENCE_PROMPT.format(
             conspiracy_context=conspiracy_context,
             key_info=key_info,
+            target_phrase=target_phrase,
+            phrase_type=phrase_type,
+            embedding_strategy=embedding_strategy,
             num_phrases=num_phrases
         )
         
@@ -282,7 +325,7 @@ Conspiracy: {premise.conspiracy_name}
             response = await self.llm.generate_json(
                 prompt,
                 temperature=config.get("temperature", 0.7),
-                max_tokens=config.get("max_tokens", 1000)
+                max_tokens=config.get("max_tokens", 3000)  # High limit to prevent truncation
             )
             
             # Parse response

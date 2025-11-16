@@ -35,7 +35,7 @@ class IdentityNodeGenerator:
     def generate_identity_chain(
         self,
         subgraph_id: str,
-        target_name: str,
+        target_character: Dict[str, Any],
         difficulty: int,
         architecture: Any
     ) -> tuple[List[EvidenceNode], List[InferenceNode]]:
@@ -44,7 +44,7 @@ class IdentityNodeGenerator:
         
         Args:
             subgraph_id: Sub-graph identifier
-            target_name: The person this chain leads to
+            target_character: Character dict with name, role, involvement_level, etc.
             difficulty: Complexity level
             architecture: Sub-graph architecture spec
         
@@ -53,6 +53,9 @@ class IdentityNodeGenerator:
         """
         evidence_nodes = []
         inference_nodes = []
+        
+        # Extract target name from character
+        target_name = target_character.get("name", "Unknown")
         
         # Generate unique identifiers for this chain
         identifiers = self._generate_identifiers(target_name, architecture)

@@ -33,18 +33,18 @@ class AnswerDimension(Enum):
 class MysteryAnswer:
     """4-blank answer template for mystery submission."""
     
-    # Canonical answers (extracted from premise)
+    # Canonical answers (discoverable through investigation)
     who: str = ""          # Conspirator name (e.g., "Dr. Liora Vance")
     what: str = ""         # Operation name (e.g., "Eclipse Veil")
-    where: str = ""        # Key location (e.g., "Ecliptic Nexus")
-    why: str = ""          # Objective (e.g., "Awaken Void Serpent")
+    why: str = ""          # Motivation (e.g., "Awaken Void Serpent")
+    how: str = ""          # Method/tactics (e.g., "Infiltrate Government")
     
     # Combined hash for contract
     combined_hash: str = ""
     
     def generate_hash(self) -> str:
         """Generate combined hash matching contract logic."""
-        combined = f"{self.who.lower()}|{self.what.lower()}|{self.where.lower()}|{self.why.lower()}"
+        combined = f"{self.who.lower()}|{self.what.lower()}|{self.why.lower()}|{self.how.lower()}"
         return hashlib.sha256(combined.encode()).hexdigest()
     
     def to_dict(self) -> Dict[str, Any]:
@@ -52,8 +52,8 @@ class MysteryAnswer:
         return {
             "who": self.who,
             "what": self.what,
-            "where": self.where,
             "why": self.why,
+            "how": self.how,
             "combined_hash": self.combined_hash
         }
 
@@ -316,6 +316,10 @@ class DocumentAssignment:
     contains_encrypted_phrase: bool = False
     contains_crypto_key: bool = False
     
+    # Answer containment (algorithmic enforcement)
+    can_contain_who_answer: bool = True  # Can include primary conspirator's full name
+    can_contain_what_answer: bool = True  # Can include full operation codename
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -374,6 +378,9 @@ class ConspiracyMystery:
     # Answer template (for submission)
     answer_template: Optional[MysteryAnswer] = None
     
+    # Questions (tailored to conspiracy)
+    questions: Optional[Dict[str, str]] = None
+    
     # Evidence structure
     subgraphs: List[SubGraph] = field(default_factory=list)
     crypto_keys: List[CryptoKey] = field(default_factory=list)
@@ -401,6 +408,7 @@ class ConspiracyMystery:
             "political_context": self.political_context.to_dict(),
             "premise": self.premise.to_dict(),
             "answer_template": self.answer_template.to_dict() if self.answer_template else None,
+            "questions": self.questions,
             "subgraphs": [sg.to_dict() for sg in self.subgraphs],
             "crypto_keys": [ck.to_dict() for ck in self.crypto_keys],
             "document_assignments": [da.to_dict() for da in self.document_assignments],
