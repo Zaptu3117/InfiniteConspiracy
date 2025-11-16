@@ -6,15 +6,15 @@ Complete file organization and directory structure for Infinite Conspiracy.
 
 ```
 InvestigationBackEnd/
-├── README.md                    # Project overview, features, quick start
-├── SETUP.md                     # Complete installation guide
+├── README.md                    # Project overview, quick start, documentation
 ├── LICENSE                      # MIT License
 ├── pyproject.toml              # Python package configuration
 ├── uv.lock                     # uv package lockfile
 │
 ├── backend/                    # Python backend (mystery generation)
 ├── contracts/                  # Smart contracts (Solidity)
-└── docs/                       # Root-level documentation
+├── docs/                       # Complete project documentation
+└── main.py                     # (legacy - can be removed)
 ```
 
 ## Backend Structure
@@ -24,11 +24,14 @@ backend/
 ├── config/
 │   └── narrator_config.yaml    # Pipeline configuration
 │
-├── scripts/                    # Utility scripts
+├── scripts/                    # Utility and deployment scripts
 │   ├── generate_mystery.py     # Main generation script
 │   ├── push_to_arkiv.py       # Arkiv deployment
 │   ├── register_on_chain.py   # Blockchain registration
-│   └── validate_mystery.py    # Mystery validation
+│   ├── validate_mystery.py    # Mystery validation
+│   ├── deploy_contract_to_network.py    # Deploy contract once
+│   ├── deploy_conspiracy_to_network.py  # Deploy conspiracy to network
+│   └── deploy_3_conspiracies.py         # Deploy multiple conspiracies
 │
 ├── src/                        # Source code
 │   ├── arkiv_integration/     # Arkiv client and entity builders
@@ -120,46 +123,32 @@ backend/
 │       ├── __init__.py
 │       └── conspiracy_validator.py  # Mystery validation
 │
-├── tests/                     # Test suite
+├── tests/                     # Complete test suite (all tests organized here)
 │   ├── README.md              # Testing documentation
 │   ├── run_all_tests.py       # Master test runner
+│   │
 │   ├── test_setup.py          # Setup validation
 │   ├── test_llm_clients.py    # LLM client tests
 │   ├── test_arkiv.py          # Arkiv integration tests
 │   ├── test_web3.py           # Web3 connection tests
-│   └── test_replicate.py      # Image generation tests
+│   ├── test_replicate.py      # Image generation tests
+│   │
+│   ├── test_conspiracy_foundation.py   # Conspiracy pipeline tests
+│   ├── test_conspiracy_full.py         # Full conspiracy generation
+│   ├── test_e2e_conspiracy_arkiv.py    # E2E with Arkiv
+│   ├── test_full_e2e_with_contract.py  # E2E with contracts
+│   ├── test_blockchain_only.py         # Blockchain tests
+│   ├── test_multi_hop_validation.py    # Validation tests
+│   ├── test_push_conspiracy.py         # Arkiv push tests
+│   ├── test_query_arkiv.py             # Arkiv query tests
+│   └── ... (other test files)          # Various integration tests
 │
-├── outputs/                   # Generated mysteries
-│   ├── mysteries/             # Mystery output directory
-│   │   └── mystery_<id>/      # Individual mystery
-│   │       ├── mystery.json   # Complete mystery data
-│   │       ├── documents/     # Document JSON files
-│   │       └── images/        # Generated images
+├── outputs/                   # Generated mysteries (cleaned regularly)
 │   ├── conspiracies/          # Conspiracy mysteries
-│   └── logs/                  # Generation logs
+│   ├── mysteries/             # Mystery output directory (if used)
+│   └── logs/                  # Generation logs (cleared regularly)
 │
-├── docs/                      # Backend documentation
-│   ├── README.md              # Documentation index
-│   ├── BACKEND_OVERVIEW.md    # System architecture
-│   ├── INSTALLATION.md        # Setup guide
-│   ├── QUICK_START.md         # Quick start guide
-│   ├── MYSTERY_GENERATION.md  # Generation pipeline
-│   ├── CONSPIRACY_SYSTEM.md   # Conspiracy details
-│   ├── DOCUMENT_GENERATION.md # Document system
-│   ├── CRYPTOGRAPHY.md        # Cipher system
-│   ├── VALIDATION.md          # Validation system
-│   ├── ARKIV_INTEGRATION.md   # Arkiv deployment
-│   ├── BLOCKCHAIN_INTEGRATION.md  # Blockchain integration
-│   ├── IMAGE_GENERATION.md    # Image generation
-│   ├── API_MODELS.md          # Data models reference
-│   ├── API_UTILITIES.md       # Utilities reference
-│   ├── CONFIGURATION.md       # Config reference
-│   ├── TESTING.md             # Testing guide
-│   ├── E2E_TESTING_GUIDE.md   # End-to-end testing
-│   ├── FRONTEND_ARKIV_INTEGRATION.md  # Frontend Arkiv guide
-│   ├── FRONTEND_QUICK_REFERENCE.md    # Frontend reference
-│   └── ARKIV_ATTRIBUTES_DESIGN.md     # Arkiv schema
-│
+├── contract_addresses.json    # Deployed contract addresses by network
 ├── env.example                # Environment template
 └── requirements.txt           # Python dependencies (deprecated, use pyproject.toml)
 ```
@@ -205,12 +194,15 @@ contracts/
 
 ```
 docs/
-├── README.md                  # Documentation index
-├── ARCHITECTURE.md            # System design and data flow
-├── PROJECT_STRUCTURE.md       # This file
-├── ARKIV_INTEGRATION.md       # Data layer integration guide
-├── SMART_CONTRACT.md          # Blockchain integration guide
-└── FRONTEND_GUIDE.md          # Frontend development guide
+├── README.md                        # Documentation index
+├── ARCHITECTURE.md                  # System design and data flow
+├── PROJECT_STRUCTURE.md             # This file
+├── ARKIV_INTEGRATION.md             # Data layer integration guide
+├── SMART_CONTRACT.md                # Blockchain integration guide
+├── FRONTEND_GUIDE.md                # Frontend development guide
+├── TESTNET_DEPLOYMENT_GUIDE.md      # Deployment to testnet/mainnet
+├── ENV_VARIABLES_GUIDE.md           # Environment variables reference
+└── README_DEPLOYMENT.md             # Deployment system overview
 ```
 
 ## Generated Outputs Structure
@@ -377,9 +369,8 @@ KUSAMA_RPC_URL=...
 - `contracts/.env` - Contract environment variables
 
 ### Documentation
-- `docs/` - Root-level docs
-- `backend/docs/` - Backend-specific docs
-- `contracts/docs/` - Contract-specific docs
+- `docs/` - All project documentation (consolidated)
+- `contracts/docs/` - Contract-specific docs (if present)
 
 ### Outputs
 - `backend/outputs/mysteries/` - Generated mysteries

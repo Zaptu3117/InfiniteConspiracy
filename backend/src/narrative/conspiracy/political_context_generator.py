@@ -13,10 +13,10 @@ POLITICAL_CONTEXT_PROMPT = """You are creating a rich fictional political and in
 
 CONSPIRACY TYPE: {conspiracy_type}
 DIFFICULTY LEVEL: {difficulty}/10
-TONE: Dark, occult, secret societies, underground networks
+TONE: Create a narrative world that strongly reflects the {conspiracy_type} conspiracy theme
 
 YOUR TASK:
-Create a detailed fictional world with shadow agencies, secret organizations, and hidden power structures.
+Create a detailed fictional world with shadow agencies, secret organizations, and hidden power structures that align with the {conspiracy_type} conspiracy theme.
 
 Generate the following elements:
 
@@ -62,7 +62,8 @@ IMPORTANT:
 - Create interconnections between organizations
 - Some groups should have hidden allegiances
 - Past events should influence current motivations
-- Make it conspiracy-themed: secret societies, occult undertones, hidden agendas
+- Make it strongly aligned with the {conspiracy_type} conspiracy theme
+- Organizations, events, and motivations should reflect {conspiracy_type} elements
 
 Output ONLY valid JSON in this exact format:
 {{

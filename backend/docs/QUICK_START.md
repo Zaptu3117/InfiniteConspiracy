@@ -373,3 +373,4 @@ echo "✅ Mystery $MYSTERY_ID is live!"
 - **Logs**: Check `outputs/logs/` for detailed error messages
 
 
+

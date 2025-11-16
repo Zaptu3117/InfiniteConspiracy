@@ -10,7 +10,8 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 from arkiv_integration import ArkivClient
 

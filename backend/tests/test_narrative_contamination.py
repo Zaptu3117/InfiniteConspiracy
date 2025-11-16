@@ -2,7 +2,10 @@
 
 import sys
 import json
-sys.path.insert(0, '/home/flex3/projects/InvestigationBackEnd/backend/src')
+import os
+
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 def test_document_contamination():
     """Check recent generated documents for contamination."""

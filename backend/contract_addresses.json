@@ -1,0 +1,27 @@
+{
+  "local": {
+    "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "deployed_at": "2025-11-16T12:08:51.344Z",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "oracle": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "network": "hardhat",
+    "block_number": 1,
+    "rpc_url": "http://localhost:8545"
+  },
+  "paseo": {
+    "address": "0xEe765776bfacB9A4D1B9f57FdC079E7bF24E1be3",
+    "deployed_at": "2025-11-16T12:01:21.188Z",
+    "deployer": "0x4dEB2Cb051A82B51A7FDC8A9b3AAfB081723a5dE",
+    "oracle": "0x4dEB2Cb051A82B51A7FDC8A9b3AAfB081723a5dE",
+    "network": "paseo",
+    "block_number": 2182521,
+    "rpc_url": "https://testnet-passet-hub-eth-rpc.polkadot.io"
+  },
+  "kusama": {
+    "address": "",
+    "deployed_at": "",
+    "deployer": "",
+    "oracle": "",
+    "network": "kusama"
+  }
+}

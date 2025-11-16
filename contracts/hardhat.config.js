@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@parity/hardhat-polkadot");  // Official Polkadot plugin
 require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -9,7 +10,8 @@ module.exports = {
       optimizer: {
         enabled: true,
         runs: 200
-      }
+      },
+      evmVersion: "paris"  // Use Paris instead of Shanghai (no PUSH0 opcode)
     }
   },
   networks: {
@@ -24,6 +26,9 @@ module.exports = {
     },
     // Paseo Testnet (Recommended for development)
     paseo: {
+      polkadot: {
+        target: 'evm'  // Required for Polkadot Hub EVM compatibility
+      },
       url: process.env.KUSAMA_RPC_URL || "https://testnet-passet-hub-eth-rpc.polkadot.io",
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
       chainId: 420420422  // Paseo Testnet Chain ID

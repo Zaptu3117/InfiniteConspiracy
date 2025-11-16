@@ -5,8 +5,9 @@ import logging
 import sys
 import os
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add src to path (go up to backend, then into src)
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 from narrative.conspiracy import (
     PoliticalContextGenerator,

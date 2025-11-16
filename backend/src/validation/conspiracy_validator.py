@@ -413,6 +413,17 @@ Provide a clear, specific answer with details from the documents. If the documen
         fields = doc.get('fields', {})
         lines = [f"Document ID: {doc.get('document_id', 'unknown')}"]
         
+        # Handle case where fields might be a list instead of dict
+        if isinstance(fields, list):
+            for item in fields:
+                if isinstance(item, dict):
+                    for key, value in item.items():
+                        if isinstance(value, str) and value.strip():
+                            lines.append(f"{key}: {value}")
+                else:
+                    lines.append(str(item))
+            return "\n".join(lines)
+        
         for key, value in fields.items():
             if isinstance(value, str) and value.strip():
                 lines.append(f"{key}: {value}")

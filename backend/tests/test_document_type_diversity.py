@@ -1,7 +1,10 @@
 """Test document type diversity after fix."""
 
 import sys
-sys.path.insert(0, '/home/flex3/projects/InvestigationBackEnd/backend/src')
+import os
+
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 from narrative.conspiracy.nodes.identity_nodes import IdentityNodeGenerator
 
@@ -91,5 +94,6 @@ def test_document_type_diversity():
 
 if __name__ == "__main__":
     test_document_type_diversity()
+
 
 

@@ -154,25 +154,66 @@ class Web3Client:
             Transaction receipt
         """
         # Get nonce (async)
-        nonce = await self.w3.eth.get_transaction_count(self.address)
+        nonce = await self.w3.eth.get_transaction_count(self.address, 'pending')
         
-        # Get gas price (async)
-        gas_price = await self.w3.eth.gas_price
+        # Get chain ID
+        chain_id = await self.w3.eth.chain_id
         
-        # Build transaction
-        tx = await function_call.build_transaction({
+        # Get gas price - check if EIP-1559 is supported
+        latest_block = await self.w3.eth.get_block('latest')
+        use_eip1559 = 'baseFeePerGas' in latest_block
+        
+        # Estimate gas if not provided
+        if not gas_limit:
+            try:
+                estimated_gas = await function_call.estimate_gas({
+                    'from': self.address,
+                    'value': value
+                })
+                
+                # Sanity check: if estimated gas is > 10M, it's likely garbage
+                if estimated_gas > 10_000_000:
+                    logger.warning(f"Unrealistic gas estimate: {estimated_gas}, using safe default")
+                    gas_limit = 500_000  # Safe default for createMystery
+                else:
+                    gas_limit = int(estimated_gas * 1.5)  # Add 50% buffer
+                    logger.info(f"Estimated gas: {estimated_gas}, using: {gas_limit}")
+            except Exception as e:
+                logger.warning(f"Gas estimation failed: {e}, using default")
+                gas_limit = 500_000  # Safe default
+        
+        # Build transaction (EIP-1559 or legacy)
+        tx_params = {
             'from': self.address,
             'nonce': nonce,
             'value': value,
-            'gas': gas_limit if gas_limit else 500000,
-            'gasPrice': gas_price
-        })
+            'gas': gas_limit,
+            'chainId': chain_id
+        }
+        
+        if use_eip1559:
+            # EIP-1559 transaction
+            base_fee = latest_block['baseFeePerGas']
+            max_priority_fee = await self.w3.eth.max_priority_fee
+            max_fee = base_fee * 2 + max_priority_fee  # 2x base fee + priority
+            
+            tx_params['maxFeePerGas'] = max_fee
+            tx_params['maxPriorityFeePerGas'] = max_priority_fee
+            logger.info(f"EIP-1559: maxFee={max_fee/10**9:.2f} Gwei, priority={max_priority_fee/10**9:.2f} Gwei")
+        else:
+            # Legacy transaction
+            gas_price = await self.w3.eth.gas_price
+            tx_params['gasPrice'] = max(gas_price, 1_000_000_000)  # At least 1 Gwei
+            logger.info(f"Legacy: gasPrice={tx_params['gasPrice']/10**9:.2f} Gwei")
+        
+        tx = await function_call.build_transaction(tx_params)
         
         # Sign transaction (synchronous - cryptographic operation)
         signed_tx = self.w3.eth.account.sign_transaction(tx, self.private_key)
         
-        # Send transaction (async)
-        tx_hash = await self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        # Send transaction (async) - handle both old and new web3 versions
+        raw_tx = signed_tx.raw_transaction if hasattr(signed_tx, 'raw_transaction') else signed_tx.rawTransaction
+        tx_hash = await self.w3.eth.send_raw_transaction(raw_tx)
         
         logger.info(f"Transaction sent: {tx_hash.hex()}")
         

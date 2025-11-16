@@ -65,10 +65,11 @@ class MysteryRegistrar:
                 mystery.metadata.difficulty
             )
             
-            # Send transaction
+            # Send transaction (let web3_client handle gas estimation with sanity checks)
             receipt = await self.client.send_transaction(
                 function_call,
-                value=bounty_wei
+                value=bounty_wei,
+                gas_limit=500_000  # Safe fixed limit (local used 212k)
             )
             
             logger.info(f"✅ Mystery registered!")
@@ -104,7 +105,7 @@ class MysteryRegistrar:
         mystery_id_bytes = self.client.string_to_bytes32(mystery_id)
         
         try:
-            mystery_data = self.client.contract.functions.getMystery(
+            mystery_data = await self.client.contract.functions.getMystery(
                 mystery_id_bytes
             ).call()
             

@@ -14,7 +14,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 from narrative.conspiracy import ConspiracyPipeline
 from utils import CerebrasClient
@@ -80,12 +81,12 @@ async def e2e_test(
     
     llm = CerebrasClient(cerebras_key)
     config = {
-        "political_context": {"temperature": 0.8, "max_tokens": 4000},
-        "conspiracy": {"temperature": 0.8, "max_tokens": 1500},
-        "psychological": {"temperature": 0.7, "max_tokens": 2000},
-        "cryptographic": {"temperature": 0.7, "max_tokens": 1500},
-        "document_generation": {"temperature": 0.7, "max_tokens": 4000, "parallel_batch_size": 5},
-        "character_enhancement": {"temperature": 0.7, "max_tokens": 1500},
+        "political_context": {"temperature": 0.8, "max_tokens": 8000},
+        "conspiracy": {"temperature": 0.8, "max_tokens": 8000},
+        "psychological": {"temperature": 0.7, "max_tokens": 8000},
+        "cryptographic": {"temperature": 0.7, "max_tokens": 8000},
+        "document_generation": {"temperature": 0.7, "max_tokens": 8000, "parallel_batch_size": 5},
+        "character_enhancement": {"temperature": 0.7, "max_tokens": 8000},
         "num_images": 2
     }
     
@@ -365,9 +366,9 @@ async def main():
     )
     parser.add_argument(
         '--type',
-        choices=['occult', 'secret_society', 'underground_network'],
+        type=str,
         default='occult',
-        help='Conspiracy type'
+        help='Conspiracy type (any narrative seed: reptilians, flat_earth, templar, occult, etc.)'
     )
     
     args = parser.parse_args()
@@ -390,5 +391,6 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
+
 
 

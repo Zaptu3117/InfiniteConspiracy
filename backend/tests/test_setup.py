@@ -7,8 +7,9 @@ Checks if all modules can be imported without errors.
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add src to path (go up to backend, then into src)
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir / "src"))
 
 print("🔍 Testing Infinite Conspiracy Backend Setup")
 print("=" * 60)

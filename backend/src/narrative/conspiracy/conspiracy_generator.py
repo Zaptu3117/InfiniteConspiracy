@@ -31,10 +31,8 @@ THE FOUR DIMENSIONS:
 2. WHAT - The Conspiracy Goal
    - What they're trying to accomplish
    - Should be significant and tie to political context
-   - Occult/secret society themed
-   - Examples: "Summon an ancient entity to gain forbidden knowledge"
-             "Infiltrate the government to trigger a ritual"
-             "Steal occult artifacts to perform a reality-altering ceremony"
+   - Strongly themed around {conspiracy_type}
+   - Make the goal authentically reflect {conspiracy_type} conspiracy beliefs and narratives
 
 3. WHY - The Motivation
    - Why they're doing this

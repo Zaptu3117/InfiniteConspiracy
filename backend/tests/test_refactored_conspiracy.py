@@ -6,7 +6,8 @@ import sys
 import json
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+backend_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
 from narrative.conspiracy.conspiracy_pipeline import ConspiracyPipeline
 from utils.llm_clients import CerebrasClient

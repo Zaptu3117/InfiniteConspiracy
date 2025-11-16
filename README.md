@@ -219,7 +219,9 @@ Comprehensive documentation available in [`docs/`](./docs):
 - **[ARKIV_INTEGRATION.md](./docs/ARKIV_INTEGRATION.md)** - Data layer usage
 - **[SMART_CONTRACT.md](./docs/SMART_CONTRACT.md)** - Contract specifications
 - **[FRONTEND_GUIDE.md](./docs/FRONTEND_GUIDE.md)** - Integration guide
-- **[API_REFERENCE.md](./docs/API_REFERENCE.md)** - Query examples
+- **[TESTNET_DEPLOYMENT_GUIDE.md](./docs/TESTNET_DEPLOYMENT_GUIDE.md)** - Deployment instructions
+- **[ENV_VARIABLES_GUIDE.md](./docs/ENV_VARIABLES_GUIDE.md)** - Environment configuration
+- **[README_DEPLOYMENT.md](./docs/README_DEPLOYMENT.md)** - Deployment system overview
 
 ## 🎪 Hackathon Submissions
 
@@ -280,7 +282,9 @@ This project is designed for **sub0 2025 Hackathon**:
 - `backend/scripts/generate_mystery.py` - Generate complete mystery
 - `backend/scripts/push_to_arkiv.py` - Upload to Arkiv
 - `backend/scripts/register_on_chain.py` - Register on blockchain
-- `backend/scripts/reveal_proof.py` - Reveal proof after expiry
+- `backend/scripts/deploy_contract_to_network.py` - Deploy smart contract to network
+- `backend/scripts/deploy_conspiracy_to_network.py` - Deploy conspiracy to network
+- `backend/scripts/validate_mystery.py` - Validate mystery quality
 
 ## 🛠️ Development
 

@@ -647,3 +647,4 @@ cat mystery.json | jq '.images[] | .validation_result'
 - [Configuration](./CONFIGURATION.md) - Config file reference
 
 
+
