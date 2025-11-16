@@ -316,9 +316,7 @@ class DocumentAssignment:
     contains_encrypted_phrase: bool = False
     contains_crypto_key: bool = False
     
-    # Answer containment (algorithmic enforcement)
-    can_contain_who_answer: bool = True  # Can include primary conspirator's full name
-    can_contain_what_answer: bool = True  # Can include full operation codename
+    # REMOVED: Answer containment flags - now handled by DocumentNarrativePlanner
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""

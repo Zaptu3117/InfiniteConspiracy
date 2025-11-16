@@ -20,6 +20,8 @@ from .nodes import (
 )
 from .document_subgraph_mapper import DocumentSubGraphMapper
 from .document_generator import ConstrainedDocumentGenerator
+from .document_narrative_planner import DocumentNarrativePlanner
+from .document_renderer import DocumentRenderer
 from .character_enhancer import CharacterEnhancer
 from .image_clue_mapper import ImageClueMapper
 from .red_herring_builder import RedHerringBuilder
@@ -57,6 +59,8 @@ class ConspiracyPipeline:
         
         self.doc_mapper = DocumentSubGraphMapper()
         self.doc_generator = ConstrainedDocumentGenerator(llm_client)
+        self.doc_planner = DocumentNarrativePlanner(llm_client)  # NEW: Planning layer with LLM
+        self.doc_renderer = DocumentRenderer(llm_client)  # NEW: Rendering layer
         self.char_enhancer = CharacterEnhancer(llm_client)
         self.image_mapper = ImageClueMapper()
         self.red_herring_builder = RedHerringBuilder()
@@ -170,61 +174,46 @@ class ConspiracyPipeline:
             self.config.get("character_enhancement", {})
         )
         
-        # PHASE 7: Document Mapping
+        # PHASE 7: Document Narrative Planning (NEW - Intelligence Layer with LLM)
         logger.info("="*60)
-        logger.info("PHASE 7: DOCUMENT MAPPING")
+        logger.info("PHASE 7: DOCUMENT NARRATIVE PLANNING (LLM-based fact extraction)")
         logger.info("="*60)
-        assignments = self.doc_mapper.map_subgraphs_to_documents(
-            subgraphs,
-            num_documents,
-            self.config.get("document_mapping", {})
+        document_plans = await self.doc_planner.create_narrative_plans(
+            subgraphs=subgraphs,
+            answer_template=answer_template,
+            characters=characters,
+            political_context=political_context,
+            premise=premise,
+            num_documents=num_documents,
+            difficulty=difficulty
         )
+        logger.info(f"   ✅ Created {len(document_plans)} narrative plans")
         
-        # PHASE 7.5: Answer Containment (algorithmic enforcement)
+        # PHASE 8: Document Rendering (NEW - Pure Rendering)
         logger.info("="*60)
-        logger.info("PHASE 7.5: ANSWER CONTAINMENT")
+        logger.info("PHASE 8: DOCUMENT RENDERING")
         logger.info("="*60)
-        assignments = self.doc_mapper.apply_answer_containment(
-            assignments,
-            subgraphs,
-            answer_template,
-            max_who_docs=3,
-            max_what_docs=1
+        documents = await self.doc_renderer.render_documents(
+            plans=document_plans,
+            characters=characters,
+            premise=premise,
+            political_context=political_context,
+            config=self.config.get("document_generation", {})
         )
-        
-        # PHASE 8: Document Generation
-        logger.info("="*60)
-        logger.info("PHASE 8: DOCUMENT GENERATION")
-        logger.info("="*60)
-        documents = await self.doc_generator.generate_documents(
-            assignments,
-            subgraphs,
-            premise,
-            political_context,
-            crypto_keys,
-            characters,
-            self.config.get("document_generation", {})
-        )
+        logger.info(f"   ✅ Rendered {len(documents)} documents")
         
         # PHASE 8b: Generate Neutral Document Names (for on-chain)
         logger.info("="*60)
         logger.info("PHASE 8B: GENERATING NEUTRAL DOCUMENT NAMES")
         logger.info("="*60)
-        doc_name_mapping = self.doc_name_gen.generate_batch(
-            assignments,
-            context={
-                "conspiracy_name": premise.conspiracy_name,
-                "world": political_context.world_name
-            }
-        )
-        # Add neutral names to documents
+        # Generate simple names based on document type
         for doc in documents:
-            doc_id = doc.get("document_id")
-            if doc_id in doc_name_mapping:
-                doc["document_name"] = doc_name_mapping[doc_id]
+            doc_id = doc.get("document_id", "unknown")
+            doc_type = doc.get("document_type", "document")
+            # Simple name generation based on type
+            doc["document_name"] = f"{doc_type}_{doc_id}.json"
         
-        logger.info(f"   ✅ Generated {len(doc_name_mapping)} neutral document names")
-        logger.info(f"      Example: {doc['document_id']} → {doc['document_name']}")
+        logger.info(f"   ✅ Generated neutral document names for {len(documents)} documents")
         
         # PHASE 9: Red Herring Integration
         logger.info("="*60)
