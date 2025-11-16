@@ -96,73 +96,42 @@ class EvidenceFactExtractor:
         appear in documents.
         """
         
-        prompt = f"""Extract atomic facts from this evidence node.
+        prompt = f"""Extract SHORT, atomic facts from this evidence node.
 
-EVIDENCE TYPE: {chain_type}
 EVIDENCE CONTENT:
-{node.content}
+{node.content[:500]}
 
-ANSWER CONTEXT (to mark answer-critical facts):
-- WHO answer: {answer_template.who}
-- WHAT answer: {answer_template.what}
-- WHY answer: {answer_template.why}
-- HOW answer: {answer_template.how}
+CRITICAL ANSWER VALUES (mark as answer-critical ONLY if exact match):
+- WHO: "{answer_template.who}"
+- WHAT: "{answer_template.what}"
+- WHY: "{answer_template.why}"
+- HOW: "{answer_template.how}"
 
-INSTRUCTIONS:
-Extract ATOMIC facts - small, concrete pieces of information that can appear in documents.
+RULES:
+1. Extract 2-4 facts max
+2. Each fact: 1-5 words ONLY
+3. For ANSWER-CRITICAL facts: Use EXACT answer value (copy character-for-character)
+4. For other facts: Extract concrete identifiers (IDs, numbers, short names)
 
-For IDENTITY evidence, extract:
-- Badge numbers (e.g., "badge_number: 5778")
-- IP addresses (e.g., "ip_address: 10.2.3.4")
-- User IDs (e.g., "user_id: jdoe_2024")
-- MAC addresses
-- Employee IDs
-- Person names (e.g., "name: Dr. Jane Doe")
+ANSWER-CRITICAL EXTRACTION:
+- If evidence mentions WHO answer → extract EXACTLY: "{answer_template.who}"
+- If evidence mentions WHAT answer → extract EXACTLY: "{answer_template.what}"
+- If evidence mentions WHY answer → extract EXACTLY: "{answer_template.why}"
+- If evidence mentions HOW answer → extract EXACTLY: "{answer_template.how}"
+- DO NOT paraphrase or modify answer values!
 
-For PSYCHOLOGICAL evidence, extract:
-- Key motivation phrases that appear verbatim
-- Character behavioral traits (short descriptions, 1-2 sentences max)
-- NOT long text blocks - only concrete observations
+OTHER FACTS:
+- Badge numbers, IPs, MAC addresses, user IDs → extract as-is
+- Character names (not the WHO answer) → extract full name
 
-For CRYPTOGRAPHIC evidence, extract:
-- Operation codenames
-- Method descriptions (tactics/techniques)
-- Encrypted message fragments (short, concrete pieces)
-- NOT entire message transcripts - only key phrases
-
-CRITICAL RULES:
-1. Each fact should be SHORT (typically 3-10 words, max 20 words)
-2. Facts should be CONCRETE and SPECIFIC
-3. Mark facts as answer-critical ONLY if they contain the exact answer text
-4. For identity: extract ALL technical identifiers separately
-5. For psychological/crypto: extract KEY PHRASES only, not full narratives
-
-OUTPUT FORMAT (JSON array):
+JSON OUTPUT:
 [
-  {{
-    "fact_type": "badge_number",
-    "value": "5778",
-    "is_answer_critical": false,
-    "answer_dimension": null
-  }},
-  {{
-    "fact_type": "name",
-    "value": "Dr. Jane Doe",
-    "is_answer_critical": true,
-    "answer_dimension": "who"
-  }},
-  {{
-    "fact_type": "motivation_phrase",
-    "value": "cement national security",
-    "is_answer_critical": true,
-    "answer_dimension": "why"
-  }}
-]
-
-Extract 2-5 atomic facts. Focus on QUALITY over quantity."""
+  {{"fact_type": "badge_number", "value": "5778", "is_answer_critical": false, "answer_dimension": null}},
+  {{"fact_type": "name", "value": "{answer_template.who}", "is_answer_critical": true, "answer_dimension": "who"}}
+]"""
 
         try:
-            response = await self.llm.generate_json(prompt, temperature=0.3, max_tokens=1000)
+            response = await self.llm.generate_json(prompt, temperature=0.3, max_tokens=2000)  # Increased for longer evidence
             
             # Convert to AtomicFact objects
             facts = []

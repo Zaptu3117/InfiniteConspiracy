@@ -2,11 +2,11 @@
 
 import logging
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pathlib import Path
 import json
 
-from models.conspiracy import ConspiracyMystery
+from models.conspiracy import ConspiracyMystery, SubGraph
 from .political_context_generator import PoliticalContextGenerator
 from .conspiracy_generator import ConspiracyGenerator
 from .answer_template_generator import AnswerTemplateGenerator
@@ -215,6 +215,13 @@ class ConspiracyPipeline:
         
         logger.info(f"   ✅ Generated neutral document names for {len(documents)} documents")
         
+        # PHASE 8c: Populate Inference Node Document IDs
+        logger.info("="*60)
+        logger.info("PHASE 8C: LINKING INFERENCE NODES TO DOCUMENTS")
+        logger.info("="*60)
+        self._populate_inference_node_document_ids(subgraphs, document_plans, documents)
+        logger.info(f"   ✅ Linked inference nodes to documents")
+        
         # PHASE 9: Red Herring Integration
         logger.info("="*60)
         logger.info("PHASE 9: RED HERRING INTEGRATION")
@@ -245,6 +252,10 @@ class ConspiracyPipeline:
         logger.info("="*60)
         logger.info("PHASE 12: PACKAGING MYSTERY")
         logger.info("="*60)
+        
+        # Legacy assignments not used in new architecture
+        assignments = []
+        
         mystery = self._package_mystery(
             political_context,
             premise,
@@ -419,6 +430,11 @@ class ConspiracyPipeline:
         )
         characters.extend(innocent_characters)
         logger.info(f"      Innocent characters: {len(innocent_characters)}")
+        
+        # NORMALIZE all character names (replace en-dashes with regular hyphens)
+        for char in characters:
+            if "name" in char:
+                char["name"] = self._normalize_to_ascii(char["name"])
         
         logger.info(f"   Generated {len(characters)} total characters (1 primary, {len(secondary_conspirators)} secondary, {len(innocent_characters)} innocent)")
         return characters
@@ -717,6 +733,60 @@ OUTPUT FORMAT (JSON array):
         
         return mystery
     
+    def _populate_inference_node_document_ids(
+        self,
+        subgraphs: List[SubGraph],
+        document_plans: List,
+        documents: List[Dict[str, Any]]
+    ):
+        """
+        Populate required_document_ids for all inference nodes.
+        
+        This maps inference nodes to the documents that contain their required evidence.
+        Used by the validator to test multi-hop reasoning chains.
+        
+        Args:
+            subgraphs: List of subgraphs containing inference nodes
+            document_plans: List of document narrative plans (with facts assigned)
+            documents: List of rendered documents (with document_ids)
+        """
+        # Build map: evidence_node_id -> document_id
+        # For each document plan, map its facts' source nodes to the document_id
+        evidence_node_to_doc_id = {}
+        for plan in document_plans:
+            for fact in plan.required_facts:
+                # Use fact's source_node_id to link evidence nodes to documents
+                evidence_node_to_doc_id[fact.source_node_id] = plan.document_id
+        
+        logger.info(f"   Mapped {len(evidence_node_to_doc_id)} evidence nodes to documents")
+        
+        # For each inference node, find required documents based on parent evidence nodes
+        updated_count = 0
+        for sg in subgraphs:
+            for inference_node in sg.inference_nodes:
+                required_doc_ids = set()
+                
+                # Get documents containing parent evidence nodes
+                for parent_id in inference_node.parent_node_ids:
+                    if parent_id in evidence_node_to_doc_id:
+                        required_doc_ids.add(evidence_node_to_doc_id[parent_id])
+                
+                # If no parents found, try to find any document from this subgraph's evidence
+                if not required_doc_ids:
+                    for evidence_node in sg.evidence_nodes:
+                        if evidence_node.node_id in evidence_node_to_doc_id:
+                            required_doc_ids.add(evidence_node_to_doc_id[evidence_node.node_id])
+                            # Just add first 1-2 documents from this subgraph
+                            if len(required_doc_ids) >= 2:
+                                break
+                
+                # Update the inference node
+                if required_doc_ids:
+                    inference_node.required_document_ids = list(required_doc_ids)
+                    updated_count += 1
+        
+        logger.info(f"   ✅ Updated {updated_count} inference nodes with document IDs")
+    
     def _save_mystery(self, mystery, validation_result, generated_images=None):
         """Save mystery to output directory with organized structure."""
         import re
@@ -824,4 +894,29 @@ OUTPUT FORMAT (JSON array):
         logger.info(f"      📁 {len(mystery.documents)} documents")
         logger.info(f"      🖼️  {len(mystery.image_clues)} image prompts")
         logger.info(f"      🔐 Documents use neutral names (e.g., System_Report_2024_11_23_7F3A.txt)")
+    
+    def _normalize_to_ascii(self, text: str) -> str:
+        """
+        Normalize text to ASCII - replace en-dashes, em-dashes with regular hyphens.
+        """
+        import unicodedata
+        
+        # Unicode normalization
+        text = unicodedata.normalize('NFKC', text)
+        
+        # Replace ALL types of dashes/hyphens with regular hyphen
+        text = text.replace('\u2010', '-')  # hyphen
+        text = text.replace('\u2011', '-')  # non-breaking hyphen
+        text = text.replace('\u2012', '-')  # figure dash
+        text = text.replace('\u2013', '-')  # en dash
+        text = text.replace('\u2014', '-')  # em dash
+        text = text.replace('\u2015', '-')  # horizontal bar
+        text = text.replace('\u2212', '-')  # minus sign
+        text = text.replace('\u00ad', '')    # soft hyphen
+        text = text.replace('\u200b', '')    # zero-width space
+        text = text.replace('\u2043', '-')  # hyphen bullet
+        text = text.replace('\ufe63', '-')  # small hyphen-minus
+        text = text.replace('\uff0d', '-')  # fullwidth hyphen-minus
+        
+        return text
 

@@ -372,3 +372,4 @@ echo "✅ Mystery $MYSTERY_ID is live!"
 - **Issues**: Open an issue on GitHub
 - **Logs**: Check `outputs/logs/` for detailed error messages
 
+

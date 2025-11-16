@@ -68,12 +68,13 @@ RULES FOR EXTRACTION:
    - This exact phrase will appear in character dialogue, diaries, or memos
    - Examples: "The Veil Must Fall", "Break the Midnight Accord", "Obsidian Codex Ritual"
 
-4. HOW (Method Phrase - Complete & Specific):
-   - Extract the COMPLETE primary method/tactic (do NOT truncate!)
-   - Should be 3-7 words, includes full context
-   - Can be: action phrase ("Infiltrate the Black Vault Division"), tactic ("Phase One Vault Infiltration Protocol"), or technical term ("Sigil-Encoded Grid Merger")
+4. HOW (Method Phrase - SHORT & Memorable):
+   - Extract a SHORT, memorable method/tactic (MAX 5 WORDS!)
+   - Should be 2-5 words, concise but specific
+   - Can be: action phrase ("Infiltrate Black Vault"), tactic ("Phase One Protocol"), or technical term ("Sigil-Encoded Merger")
    - This MUST be a METHOD/ACTION, NOT a person's name
-   - This exact phrase will appear naturally in planning docs or technical memos
+   - This exact phrase will appear in planning docs or technical memos
+   - CRITICAL: Keep it SHORT so LLM can embed it in documents without hitting token limits
    - CRITICAL: Include full details, not just first few words!
 
 OUTPUT FORMAT (JSON only, no explanation):
@@ -127,6 +128,12 @@ Generate the JSON now:"""
             if self._looks_like_person_name(how):
                 logger.warning(f"HOW looks like person name: '{how}', re-extracting")
                 how = self._fallback_extract_how(premise.how)
+            
+            # NORMALIZE to ASCII (replace en-dashes, em-dashes with regular hyphens)
+            who = self._normalize_to_ascii(who)
+            what = self._normalize_to_ascii(what)
+            why = self._normalize_to_ascii(why)
+            how = self._normalize_to_ascii(how)
             
             logger.info(f"   WHO: {who}")
             logger.info(f"   WHAT: {what}")
@@ -192,6 +199,31 @@ Generate the JSON now:"""
         has_action = any(verb in text.lower() for verb in action_verbs)
         
         return (has_title and all_capitalized) or (all_capitalized and not has_action and len(words) <= 3)
+    
+    def _normalize_to_ascii(self, text: str) -> str:
+        """
+        Normalize text to ASCII - replace en-dashes, em-dashes with regular hyphens.
+        """
+        import unicodedata
+        
+        # Unicode normalization
+        text = unicodedata.normalize('NFKC', text)
+        
+        # Replace ALL types of dashes/hyphens with regular hyphen
+        text = text.replace('\u2010', '-')  # hyphen
+        text = text.replace('\u2011', '-')  # non-breaking hyphen
+        text = text.replace('\u2012', '-')  # figure dash
+        text = text.replace('\u2013', '-')  # en dash
+        text = text.replace('\u2014', '-')  # em dash
+        text = text.replace('\u2015', '-')  # horizontal bar
+        text = text.replace('\u2212', '-')  # minus sign
+        text = text.replace('\u00ad', '')    # soft hyphen
+        text = text.replace('\u200b', '')    # zero-width space
+        text = text.replace('\u2043', '-')  # hyphen bullet
+        text = text.replace('\ufe63', '-')  # small hyphen-minus
+        text = text.replace('\uff0d', '-')  # fullwidth hyphen-minus
+        
+        return text
     
     def _fallback_extract_who(self, who_text: str) -> str:
         """Fallback extraction for WHO using simple rules."""

@@ -371,3 +371,4 @@ Frontend calls these functions:
 - [Game Mechanics](./GAME_MECHANICS.md) - How the game works
 - [Integration Guide](./INTEGRATION.md) - Integrate with frontend/backend
 
+

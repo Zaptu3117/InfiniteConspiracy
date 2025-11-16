@@ -67,8 +67,14 @@ class DocumentRenderer:
             batch = tasks[i:i+batch_size]
             logger.info(f"  Rendering batch {i//batch_size + 1}/{(len(tasks)-1)//batch_size + 1}...")
             
-            batch_results = await asyncio.gather(*batch)
-            documents.extend(batch_results)
+            batch_results = await asyncio.gather(*batch, return_exceptions=True)
+            
+            # Filter out exceptions and log them
+            for idx, result in enumerate(batch_results):
+                if isinstance(result, Exception):
+                    logger.error(f"  ❌ Document in batch failed: {result}")
+                else:
+                    documents.append(result)
             
             # Delay between batches to avoid rate limits
             if i + batch_size < len(tasks):
@@ -125,7 +131,7 @@ class DocumentRenderer:
                 response = await self.llm.generate_json(
                     prompt,
                     temperature=config.get("temperature", 0.7),
-                    max_tokens=config.get("max_tokens", 3000)
+                    max_tokens=config.get("max_tokens", 6000)  # Reasonable limit - too high causes issues
                 )
                 
                 # Validate that required facts are present
@@ -145,18 +151,34 @@ class DocumentRenderer:
         """
         Format atomic facts for prompt.
         
-        Simple and direct - no containment logic.
+        Normalizes special characters to ASCII to make it easier for LLM.
         """
         if not facts:
             return "No specific facts required."
         
-        lines = ["REQUIRED FACTS TO INCLUDE:"]
-        lines.append("=" * 60)
+        # Separate answer-critical facts from regular facts
+        critical_facts = [f for f in facts if f.is_answer_critical]
+        regular_facts = [f for f in facts if not f.is_answer_critical]
         
-        for i, fact in enumerate(facts, 1):
-            lines.append(f"\n{i}. {fact.fact_type}: {fact.value}")
+        lines = []
         
-        lines.append("\n" + "=" * 60)
+        # Show CRITICAL facts first with emphasis
+        if critical_facts:
+            lines.append("🔴 CRITICAL ANSWER FACTS (MUST INCLUDE THESE FIRST):")
+            lines.append("=" * 60)
+            for i, fact in enumerate(critical_facts, 1):
+                normalized_value = self._normalize_for_matching(fact.value)
+                lines.append(f"{i}. \"{normalized_value}\"")
+            lines.append("=" * 60)
+            lines.append("")
+        
+        # Show regular facts
+        if regular_facts:
+            lines.append("Additional facts to include:")
+            for i, fact in enumerate(regular_facts, 1):
+                normalized_value = self._normalize_for_matching(fact.value)
+                lines.append(f"- \"{normalized_value}\"")
+        
         return "\n".join(lines)
     
     def _build_prompt(
@@ -174,7 +196,9 @@ class DocumentRenderer:
         No containment warnings - the facts list already contains
         only what should be included.
         """
-        prompt = f"""Generate a realistic {plan.document_type} document.
+        prompt = f"""OUTPUT JSON DIRECTLY - NO EXPLANATIONS, NO THINKING, NO COMMENTS.
+
+Generate a realistic {plan.document_type} document.
 
 NARRATIVE PURPOSE:
 {plan.narrative_purpose}
@@ -192,23 +216,19 @@ CONTEXT:
 - Time Period: {political_context.time_period}
 - Conspiracy Type (subtle background): {premise.conspiracy_type}
 
-INSTRUCTIONS:
-1. Include ALL required facts listed above (use exact values)
-2. Add realistic environmental details:
-   - For logs: timestamps, system messages, other mundane entries
-   - For emails/memos: natural conversation flow, greetings, context
-   - For reports: proper formatting, official tone
-3. Make it feel like a real document from this world
-4. Weave facts naturally into the content
-5. Generate DETAILED content:
-   - Technical logs: 8-12 entries
-   - Emails/documents: 2-4 paragraphs minimum
-   - Hide evidence in details, not obvious
+CRITICAL INSTRUCTIONS:
+1. Include ALL required facts listed above (use EXACT values)
+2. Keep it BRIEF - MAXIMUM 3-4 entries for logs, 1-2 paragraphs for text
+3. Add 1-2 mundane details only
+4. COMPLETE the JSON properly - close all strings, objects, and arrays
+5. If approaching token limit, END the document cleanly rather than leaving it incomplete
 
 DOCUMENT TYPE GUIDELINES:
 {self._get_document_type_guidelines(plan.document_type)}
 
-OUTPUT FORMAT (JSON):
+OUTPUT FORMAT (STRICT JSON):
+CRITICAL: Return ONLY valid JSON. NO markdown formatting (**, __, etc.). NO comments.
+
 {{
   "document_id": "{plan.document_id}",
   "document_type": "{plan.document_type}",
@@ -218,50 +238,27 @@ OUTPUT FORMAT (JSON):
     {self._get_expected_fields(plan.document_type)}
   }}
 }}
+
+VALIDATION RULES:
+- Use EXACT character values for all required facts (including special characters like ‑, -, etc.)
+- Every required fact MUST appear verbatim somewhere in the document
+- Double-check that names/IDs match exactly before returning
 """
         return prompt
     
     def _get_document_type_guidelines(self, doc_type: str) -> str:
-        """Get specific guidelines for document type."""
+        """Get concise guidelines for document type."""
         guidelines = {
-            "security_access_log": """
-- Format: Structured log entries with timestamps
-- Include: Badge IDs, access times, locations, door IDs
-- Add mundane entries mixed with evidence
-- System boot messages, periodic checks
-""",
-            "internal_email": """
-- Format: from, to, subject, body
-- Include: Natural conversation, greetings
-- Add: References to meetings, previous emails
-- Tone: Professional but natural
-""",
-            "performance_review": """
-- Format: employee_name, date, reviewer, content, rating
-- Include: Behavioral observations, work quality
-- Add: Specific examples, timeline
-- Tone: Professional, evaluative
-""",
-            "encrypted_message": """
-- Format: message_id, sender, recipient, encrypted_content
-- Include: Encrypted phrases, cipher hints
-- Add: Message metadata, routing info
-- Tone: Technical, secure
-""",
-            "meeting_notes": """
-- Format: date, attendees, subject, notes
-- Include: Discussion points, decisions
-- Add: Action items, follow-ups
-- Tone: Informal but organized
-""",
-            "system_log": """
-- Format: Structured entries with timestamps
-- Include: Service events, API calls, errors
-- Add: System status, health checks
-- Tone: Technical, automated
-"""
+            "security_access_log": "Structured log entries with timestamps, badge IDs, access times, locations. 3-4 entries max.",
+            "internal_email": "from, to, subject, body format. Professional tone, 1-2 short paragraphs.",
+            "performance_review": "employee_name, date, reviewer, content. Brief behavioral observations.",
+            "encrypted_message": "message_id, sender, recipient, encrypted_content. Technical, secure tone.",
+            "meeting_notes": "date, attendees, subject, notes. Brief discussion points and decisions.",
+            "system_log": "Structured entries with timestamps, service events. 3-4 entries max.",
+            "personnel_file": "employee_name, employee_id, department, notes. Brief activity summary.",
+            "incident_report": "report_id, date, reporter, description. Brief incident summary."
         }
-        return guidelines.get(doc_type, "Generate appropriate format for this document type.")
+        return guidelines.get(doc_type, "Generate appropriate brief format for this document type.")
     
     def _get_expected_fields(self, doc_type: str) -> str:
         """Get expected JSON fields for document type."""
@@ -289,7 +286,7 @@ OUTPUT FORMAT (JSON):
         return field_templates.get(doc_type, '"content": "..."')
     
     def _select_author(self, doc_type: str, characters: List[Dict[str, Any]]) -> str:
-        """Select appropriate author for document type."""
+        """Select appropriate author for document type. Normalizes name to ASCII."""
         # System documents
         if "log" in doc_type or "system" in doc_type:
             return "system"
@@ -297,7 +294,9 @@ OUTPUT FORMAT (JSON):
         # Character documents
         if characters:
             char = random.choice(characters)
-            return char.get("name", "Unknown")
+            name = char.get("name", "Unknown")
+            # Normalize to prevent en-dash issues
+            return self._normalize_for_matching(name)
         
         return "Author"
     
@@ -315,18 +314,75 @@ OUTPUT FORMAT (JSON):
         """
         Validate that all required facts are present in the document.
         
-        Simple validation - just check if fact values appear in document.
+        Normalizes special characters to handle LLM substitutions.
         """
         import json
+        import unicodedata
+        
+        # Normalize document text
         doc_str = json.dumps(document).lower()
+        doc_str_normalized = self._normalize_for_matching(doc_str)
         
         missing_facts = []
         for fact in required_facts:
-            if fact.value.lower() not in doc_str:
+            # Normalize the fact value for matching
+            fact_normalized = self._normalize_for_matching(fact.value.lower())
+            
+            if fact_normalized not in doc_str_normalized:
                 missing_facts.append(f"{fact.fact_type}: {fact.value}")
         
         if missing_facts:
             logger.warning(f"  ⚠️  Validation failed for {doc_id}")
             logger.warning(f"      Missing facts: {missing_facts}")
             raise ValueError(f"Required facts missing from document: {missing_facts}")
+    
+    def _normalize_for_matching(self, text: str) -> str:
+        """
+        Normalize text for matching - handle special characters and accents that LLMs often substitute.
+        
+        - Converts en-dash (‑), em-dash (—), minus (−) to regular hyphen (-)
+        - Removes accents (á → a, é → e, etc.)
+        - Removes zero-width spaces
+        - Normalizes Unicode
+        """
+        import unicodedata
+        
+        # First normalize Unicode
+        text = unicodedata.normalize('NFD', text)
+        
+        # Remove accents by stripping combining characters
+        text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
+        
+        # Recompose
+        text = unicodedata.normalize('NFC', text)
+        
+        # Replace ALL types of dashes/hyphens with regular hyphen
+        text = text.replace('\u2010', '-')  # hyphen
+        text = text.replace('\u2011', '-')  # non-breaking hyphen
+        text = text.replace('\u2012', '-')  # figure dash
+        text = text.replace('\u2013', '-')  # en dash
+        text = text.replace('\u2014', '-')  # em dash
+        text = text.replace('\u2015', '-')  # horizontal bar
+        text = text.replace('\u2212', '-')  # minus sign
+        text = text.replace('\u00ad', '')    # soft hyphen
+        text = text.replace('\u200b', '')    # zero-width space
+        text = text.replace('\u2043', '-')  # hyphen bullet
+        text = text.replace('\ufe63', '-')  # small hyphen-minus
+        text = text.replace('\uff0d', '-')  # fullwidth hyphen-minus
+        
+        # Normalize all types of spaces to regular space
+        text = text.replace('\u00a0', ' ')   # no-break space
+        text = text.replace('\u202f', ' ')   # narrow no-break space (PROBLEM CHARACTER!)
+        text = text.replace('\u2009', ' ')   # thin space
+        text = text.replace('\u2008', ' ')   # punctuation space
+        text = text.replace('\u2007', ' ')   # figure space
+        text = text.replace('\u2006', ' ')   # six-per-em space
+        text = text.replace('\u2005', ' ')   # four-per-em space
+        text = text.replace('\u2004', ' ')   # three-per-em space
+        text = text.replace('\u2003', ' ')   # em space
+        text = text.replace('\u2002', ' ')   # en space
+        text = text.replace('\u2000', ' ')   # en quad
+        text = text.replace('\u2001', ' ')   # em quad
+        
+        return text
 

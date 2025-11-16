@@ -190,6 +190,22 @@ class DocumentNarrativePlanner:
             plans.append(plan)
             doc_id += 1
         
+        # Fill remaining slots if we're under target
+        while len(plans) < num_documents:
+            # Create additional mixed-type documents
+            if identity_chains:
+                plan = self._create_identity_document_plan(doc_id, identity_chains, political_context)
+            elif psychological_chains:
+                plan = self._create_psychological_document_plan(doc_id, psychological_chains, political_context)
+            elif crypto_chains:
+                plan = self._create_crypto_document_plan(doc_id, crypto_chains, political_context)
+            else:
+                # Fallback: create generic document
+                plan = self._create_identity_document_plan(doc_id, [], political_context)
+            
+            plans.append(plan)
+            doc_id += 1
+        
         return plans
     
     def _create_identity_document_plan(
@@ -503,7 +519,11 @@ class DocumentNarrativePlanner:
         """
         Assign non-answer facts to documents.
         These provide context and help create the evidence network.
+        
+        CRITICAL: Keep fact count LOW to avoid bloated documents!
         """
+        MAX_FACTS_PER_DOC = 6  # Hard cap to prevent bloat
+        
         for doc_plan in doc_plans:
             # Get all facts from connected chains
             for chain_id in doc_plan.connected_chains:
@@ -513,8 +533,8 @@ class DocumentNarrativePlanner:
                     # Add non-answer facts (if not already added)
                     for fact in chain_facts:
                         if not fact.is_answer_critical and fact not in doc_plan.required_facts:
-                            # Add some supporting facts (not all, to avoid clutter)
-                            if random.random() < 0.6:  # 60% chance to include
+                            # REDUCED probability and hard cap to prevent bloat
+                            if len(doc_plan.required_facts) < MAX_FACTS_PER_DOC and random.random() < 0.3:  # Only 30% chance
                                 doc_plan.required_facts.append(fact)
     
     def _design_cross_chain_documents(

@@ -646,3 +646,4 @@ cat mystery.json | jq '.images[] | .validation_result'
 - [Validation](./VALIDATION.md) - Validation system guide
 - [Configuration](./CONFIGURATION.md) - Config file reference
 
+

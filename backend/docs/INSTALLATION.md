@@ -417,3 +417,4 @@ If you encounter issues:
 3. Check logs: `tail -f outputs/logs/generation_*.log`
 4. Open an issue on GitHub with error details
 
+

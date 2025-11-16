@@ -92,3 +92,4 @@ def test_document_type_diversity():
 if __name__ == "__main__":
     test_document_type_diversity()
 
+
