@@ -54,7 +54,7 @@ _Game designer, UX specialist_
 
 | Resource | Link |
 |----------|------|
-| 🎮 **Live Demo** | [demo.infiniteconspiracy.xyz](https://frontend-1zw3957uj-clemences-projects-c5bedfda.vercel.app/) |
+| 🎮 **Live Frontend Demo : New link !** | [demo.infiniteconspiracy.xyz](https://frontend-mu-ruddy-43.vercel.app/) |
 | 📹 **Pitch Video** | [Watch on Google Drive](https://drive.google.com/drive/folders/1nmS4Jnbtfx6JdVRLNRZX5f_OziBxtKQr?usp=sharing) _(3-min demo)_ |
 | 📊 **Pitch Deck** | [View Deck](https://drive.google.com/drive/folders/1fJuVlFbf387FSuIQFGmjFFdgCY6s9SED?usp=sharing) _(Google Slides)_ |
 | 📖 **Documentation** | [Full Docs](./docs/) |
